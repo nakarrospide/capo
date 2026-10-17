@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mesa de Capo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="src/mesa.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Mesa de Capo</h1>
+    <span class="ver" id="origin">config.json</span>
+    <a class="link" href="index.html">Abrir el juego →</a>
+  </header>
+
+  <div class="bench">
+    <div class="stage">
+      <div class="phone"><div class="view" id="view"></div><span class="state" id="state">cargando</span></div>
+      <div class="pad">
+        <button id="bL" aria-label="Izquierda">◀</button>
+        <button id="bR" aria-label="Derecha">▶</button>
+        <button id="bJ">Saltar</button>
+        <button id="bD" class="dance">Bailar</button>
+      </div>
+      <p class="keys">← → mover · espacio saltar · B bailar</p>
+    </div>
+
+    <aside>
+      <section class="push">
+        <button class="btn primary big" id="pushBtn">Pushear al juego</button>
+        <p class="note" id="pushNote">Guarda estos ajustes en este dispositivo. El juego los toma al abrirlo, o al instante si ya está abierto en otra pestaña.</p>
+        <div class="btns">
+          <button class="btn" id="copyBtn">Copiar config</button>
+          <button class="btn" id="resetBtn">Volver a config.json</button>
+        </div>
+        <textarea id="copyArea" class="copy" readonly hidden></textarea>
+      </section>
+
+      <section>
+        <h2>Obra</h2>
+        <div class="seg" id="levels"></div>
+        <p class="note">Se camina sobre lo pintado. El azul rebota y Capo gira 360.</p>
+      </section>
+
+      <section>
+        <h2>Sensación del salto</h2>
+        <div id="feel"></div>
+      </section>
+
+      <section>
+        <h2>Cámara y baile</h2>
+        <div id="cam"></div>
+      </section>
+
+      <section>
+        <h2>Sacudir para saltar</h2>
+        <label class="tog" for="shakeOn">Activado en el juego <input type="checkbox" id="shakeOn"></label>
+        <div id="shake"></div>
+        <p class="note">Más bajo, salta con movimientos suaves. Más alto, hay que sacudir fuerte.</p>
+      </section>
+
+      <section>
+        <h2>Probar hoja de secuencia</h2>
+        <label class="file">Cargar hoja (PNG o JPG)<input type="file" id="sheetFile" accept="image/*"></label>
+        <div class="grid3">
+          <label for="fw">ancho cuadro<input id="fw" type="number" value="256" min="8"></label>
+          <label for="fh">alto cuadro<input id="fh" type="number" value="256" min="8"></label>
+          <label for="fps">cuadros/s<input id="fps" type="number" value="10" min="1" max="30"></label>
+        </div>
+        <div class="btns"><button class="btn" id="sheetOff" hidden>Volver a las poses de Capo</button></div>
+        <span class="status" id="sheetStatus">Usando la hoja de poses de Capo</span>
+        <p class="note">Solo para probar acá. Cuando una hoja te convence, pasámela y la sumo al repo.</p>
+      </section>
+
+      <section>
+        <label class="tog" for="showCol">Ver superficies pisables <input type="checkbox" id="showCol"></label>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<script src="src/config.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/controls.js"></script>
+<script src="src/mesa.js"></script>
+</body>
+</html>

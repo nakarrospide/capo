@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "level": "color",
+  "feel": {
+    "grav": 1500,
+    "jump": 620,
+    "speed": 230,
+    "coyote": 110,
+    "bounce": 1.45
+  },
+  "camera": {
+    "zoom": 2.4
+  },
+  "shake": {
+    "enabled": true,
+    "threshold": 14
+  },
+  "dance": {
+    "beat": 0.52
+  },
+  "capo": {
+    "height": 70,
+    "idle": "A4",
+    "walk": ["D1", "D2", "D3"],
+    "takeoff": "D4",
+    "rise": "D5",
+    "spin": "D6",
+    "fall": "A8",
+    "yogaAfter": 3.5,
+    "yoga": ["C7", "C3", "C4", "C1", "C2", "C5", "C6", "B7", "B6", "C0", "B4"],
+    "dance": ["A0", "A1", "A2", "A3", "A5", "A6", "A7", "A8", "B0", "B1", "B2", "B3", "B5"]
+  }
+}

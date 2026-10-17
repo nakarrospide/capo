@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#1b1c21">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Capo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="src/game.css">
+</head>
+<body>
+  <main class="console">
+    <header class="top">
+      <span class="brand">CAPO</span>
+      <span class="state" id="state">cargando</span>
+      <button class="chip" id="shakeBtn" hidden>sacudir: off</button>
+      <a class="chip" href="mesa.html">mesa</a>
+    </header>
+
+    <div class="screen">
+      <div class="view" id="view"></div>
+      <div class="start" id="start">
+        <p class="start-title">Capo</p>
+        <p class="start-sub">Tocá para empezar</p>
+        <p class="start-hint" id="startHint">Sacudí el celular para saltar</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="dpad">
+        <button id="bL" aria-label="Izquierda"><span>◀</span></button>
+        <button id="bR" aria-label="Derecha"><span>▶</span></button>
+      </div>
+      <div class="ab">
+        <button id="bD" class="round b" aria-label="Bailar"><span>B</span><small>bailar</small></button>
+        <button id="bJ" class="round a" aria-label="Saltar"><span>A</span><small>saltar</small></button>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+  <script src="src/config.js"></script>
+  <script src="src/engine.js"></script>
+  <script src="src/controls.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
