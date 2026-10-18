@@ -120,10 +120,10 @@ window.CapoControls = (function () {
     return { release: () => { id = null; apply({ l: false, r: false, u: false }); } };
   }
 
-  // Zonas invisibles: mitad izquierda arrastrás para caminar (aparece un stick donde apoyás),
-  // mitad derecha tocás para saltar (mantener = salto más largo).
+  // Zona invisible: en la mitad izquierda, donde apoyás aparece un stick y arrastrás para caminar.
+  // Saltar y bailar son botones aparte.
   function zones(el, api, stick, knob) {
-    let mover = null, jumper = null, ox = 0, oy = 0, side = 0;
+    let mover = null, ox = 0, oy = 0, side = 0;
     const R = 46;
     function moveTo(e) {
       let dx = e.clientX - ox, dy = e.clientY - oy;
@@ -145,22 +145,17 @@ window.CapoControls = (function () {
         knob.style.transform = 'translate(0, 0)';
         stick.classList.add('show');
         haptic(6);
-      } else if (!left && jumper === null) {
-        jumper = e.pointerId;
-        api.input.jumpPressed = true; api.input.jump = true;
-        haptic(12); ripple(el, e.clientX, e.clientY);
       }
     });
     el.addEventListener('pointermove', e => { if (e.pointerId === mover) moveTo(e); });
     const end = e => {
       if (e.pointerId === mover) { mover = null; side = 0; api.input.l = api.input.r = false; stick.classList.remove('show'); }
-      if (e.pointerId === jumper) { jumper = null; api.input.jump = false; }
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
     el.addEventListener('contextmenu', e => e.preventDefault());
     return {
-      release() { mover = jumper = null; api.input.l = api.input.r = api.input.jump = false; stick.classList.remove('show'); }
+      release() { mover = null; api.input.l = api.input.r = false; stick.classList.remove('show'); }
     };
   }
 

@@ -10,16 +10,13 @@
   const vibrate = ms => CapoControls.haptic(ms);
   const gameEl = $('game');
 
-  // Dos UIs para comparar: "botones" (vidrio sobre la obra) y "zonas" (sin botones fijos).
-  // Se elige con ?ui=zonas o con el botón de arriba, y queda guardada en el celu.
-  const UI_KEY = 'capo-ui';
+  // UI principal: "zonas" (stick donde apoyás + saltar y bailar). La cruceta vieja sigue en ?ui=botones.
   const HINTS = {
     botones: 'Cruceta para caminar\narriba o A salta · B baila',
-    zonas: 'Izquierda: arrastrá para caminar\nDerecha: tocá para saltar'
+    zonas: 'Izquierda: arrastrá para caminar\nDerecha: saltar y bailar'
   };
   let ui = new URLSearchParams(location.search).get('ui');
-  if (!HINTS[ui]) { try { ui = localStorage.getItem(UI_KEY); } catch (_) { ui = null; } }
-  if (!HINTS[ui]) ui = 'botones';
+  if (!HINTS[ui]) ui = 'zonas';
 
   const api = CapoEngine.create({
     parent: $('view'),
@@ -39,21 +36,16 @@
   CapoControls.pad(api, { jump: 'bJ', dance: 'bD' });
   const crossPad = CapoControls.cross($('cross'), api, $('crossGlass'));
   const zonePad = CapoControls.zones($('zones'), api, $('stick'), $('knob'));
-  $('zD').addEventListener('pointerdown', e => {
-    e.preventDefault(); e.stopPropagation();
-    CapoControls.haptic(14); CapoControls.ripple($('zD'), e.clientX, e.clientY); api.dance();
-  });
+  CapoControls.pad(api, { jump: 'zJ', dance: 'zD' });
 
   function setUI(next) {
     ui = next;
     crossPad.release(); zonePad.release();
     gameEl.dataset.ui = ui;
     $('uiHint').textContent = HINTS[ui];
-    try { localStorage.setItem(UI_KEY, ui); } catch (_) { /* nada */ }
     api.resize();
   }
   setUI(ui);
-  $('uiSwap').addEventListener('click', () => { CapoControls.haptic(10); setUI(ui === 'botones' ? 'zonas' : 'botones'); });
 
   // Más fuerte la sacudida, más alto el salto.
   const shake = CapoControls.shake(() => cfg, (mag, th) => {

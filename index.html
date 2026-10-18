@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="src/game.css">
 </head>
 <body>
-  <main class="game" id="game" data-ui="botones">
+  <main class="game" id="game" data-ui="zonas">
     <div class="view" id="view"></div>
 
     <!-- UI 1: botones de vidrio sobre la obra -->
@@ -31,15 +31,18 @@
       </div>
     </div>
 
-    <!-- UI 2: sin botones. Izquierda arrastrás para caminar, derecha tocás para saltar -->
+    <!-- UI 2 (la principal): stick que aparece donde apoyás a la izquierda, saltar y bailar a la derecha -->
     <div class="zones" id="zones">
       <div class="stick" id="stick" aria-hidden="true"><span class="knob" id="knob"></span></div>
     </div>
-    <button class="round small dance-ghost" id="zD" aria-label="Bailar"></button>
-
-    <button class="ui-swap" id="uiSwap" aria-label="Cambiar controles">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3" /></svg>
-    </button>
+    <div class="zbtns">
+      <button class="round dance" id="zD" aria-label="Bailar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></svg>
+      </button>
+      <button class="round jump" id="zJ" aria-label="Saltar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 14l6-6 6 6" /></svg>
+      </button>
+    </div>
 
     <div class="start" id="start">
       <p class="start-title">Capo</p>
