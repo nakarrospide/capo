@@ -1,6 +1,9 @@
 // Juego para celular: pantalla completa, botones tipo consola y salto al sacudir.
 (async function () {
-  let cfg = await CapoConfig.load();
+  // El juego siempre arranca en Vigilia, aunque la mesa haya pusheado otra obra.
+  const START_LEVEL = 'vigilia';
+  const loadCfg = async () => ({ ...(await CapoConfig.load()), level: START_LEVEL });
+  let cfg = await loadCfg();
   const $ = id => document.getElementById(id);
   const stateEl = $('state'), startEl = $('start'), shakeBtn = $('shakeBtn');
 
@@ -48,7 +51,7 @@
   // La mesa de trabajo pushea ajustes nuevos: si el juego está abierto en otra pestaña, los toma al toque.
   addEventListener('storage', async e => {
     if (e.key !== CapoConfig.KEY) return;
-    cfg = await CapoConfig.load();
+    cfg = await loadCfg();
     api.setConfig(cfg);
     paintShake();
     stateEl.textContent = 'ajustes nuevos';

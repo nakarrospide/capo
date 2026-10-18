@@ -6,7 +6,7 @@ window.CapoConfig = (function () {
 
   const FALLBACK = {
     version: 1,
-    level: 'color',
+    level: 'vigilia',
     feel: { grav: 1500, jump: 620, speed: 230, coyote: 110, bounce: 1.45 },
     camera: { zoom: 2.4 },
     shake: { enabled: true, threshold: 14 },
