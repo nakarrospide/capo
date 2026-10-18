@@ -62,3 +62,11 @@ python3 -m http.server 8000
 ```
 
 y abrir `http://localhost:8000`.
+
+## Antes de pushear
+
+```
+python3 tools/bump.py
+```
+
+Le pone una versión nueva a los CSS y JS en `index.html` y `mesa.html`. Sin esto, Safari puede mezclar el HTML nuevo con archivos viejos guardados y la pantalla se rompe hasta que vence el caché.
