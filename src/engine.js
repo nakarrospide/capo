@@ -82,7 +82,7 @@ window.CapoEngine = (function () {
     const input = { l: false, r: false, jump: false, jumpPressed: false };
     let scene, player, fx, dbg, bg, capoImg, camTarget, frames = {};
     let sprite = null, spriteMeta = null;
-    let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [], fragiles = [];
+    let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [], fragiles = [], eyes = [], checkpoint = -1;
     let levelId = new URLSearchParams(location.search).get('nivel') || cfg.level;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
@@ -141,6 +141,10 @@ window.CapoEngine = (function () {
         if (L.built) {
           for (const ly of L.layers) this.load.image('lvl-' + id + '-' + ly.key, ly.src);
           for (const n in L.images || {}) this.load.image('lvl-' + id + '-img-' + n, L.images[n]);
+          for (const n in L.sheets || {}) {
+            const sh = L.sheets[n];
+            this.load.spritesheet('lvl-' + id + '-sheet-' + n, sh.src, { frameWidth: sh.fw, frameHeight: sh.fh });
+          }
         }
         else this.load.image('lvl-' + id, L.src);
       }
@@ -177,7 +181,7 @@ window.CapoEngine = (function () {
       if (!LEVELS[id]) id = 'color';
       levelId = id;
       if (!scene) return;
-      built.forEach(o => o.destroy()); built = []; fragiles = [];
+      built.forEach(o => o.destroy()); built = []; fragiles = []; eyes = []; checkpoint = -1;
       const L = LEVELS[id];
       if (L.built) {
         setDims(L.w, L.h);
@@ -224,6 +228,138 @@ window.CapoEngine = (function () {
       }
       const fkey = 'lvl-' + id + '-img-fragil';
       if (scene.textures.exists(fkey)) for (const p of L.platforms) if (p.t === 'fragil') makeFragile(p, L.grid, fkey);
+      for (const e of L.eyes || []) makeEye(e, L, id);
+    }
+
+    /* Ojo láser: dormido, despierto, carga (aviso con línea negra), disparo y descanso.
+       El haz corta en cualquier superficie sólida, así que los pilares sirven de cobertura. */
+    const EYE = { open: 0.6, charge: 0.9, fire: 0.5, rest: 1.5, wake: 200, height: 62, range: 1100, beamW: 18 };
+    const FR = { sleep: 0, open: 1, charge: 2, fire: 3, rest: 4 };
+    function makeEye(e, L, id) {
+      const sh = L.sheets.ojo, G = L.grid, sc = EYE.height / sh.fh;
+      const bx = e.x * G, by = e.y * G, down = !!e.down;
+      const lift = (sh.fh - sh.cy) * sc;
+      const sprite = scene.add.sprite(bx, by, 'lvl-' + id + '-sheet-ojo', FR.sleep)
+        .setOrigin(0.5, down ? 0 : 1).setScale(sc).setFlipY(down).setDepth(-3);
+      built.push(sprite);
+      // Haz y salpicadura pintados (si el nivel los trae); si no, se dibuja con líneas.
+      const hk = 'lvl-' + id + '-img-haz', ik = 'lvl-' + id + '-img-impacto';
+      let beam = null, splash = null;
+      if (scene.textures.exists(hk)) {
+        const th = scene.textures.get(hk).getSourceImage().height;
+        beam = scene.add.tileSprite(bx, by, 10, EYE.beamW, hk).setOrigin(0, 0.5).setTileScale(EYE.beamW / th).setDepth(11).setVisible(false);
+        built.push(beam);
+      }
+      if (scene.textures.exists(ik)) { splash = scene.add.image(0, 0, ik).setDepth(11).setVisible(false); built.push(splash); }
+      eyes.push({
+        beam, splash,
+        cx: bx, cy: down ? by + lift : by - lift, sprite, type: e.type || 'fijo',
+        base: (e.angle || 0) * Math.PI / 180, arc: (e.arc || 60) * Math.PI / 180,
+        offset: e.offset || 0, state: 'sleep', t: 0, aim: (e.angle || 0) * Math.PI / 180, end: null, wob: Math.random() * 6
+      });
+    }
+    // Recorre el haz celda por celda hasta tocar algo sólido.
+    function castBeam(x, y, a) {
+      const dx = Math.cos(a), dy = Math.sin(a), m = masks[levelId];
+      for (let d = 22; d < EYE.range; d += 3) {
+        const px = x + dx * d, py = y + dy * d;
+        if (px < 0 || px >= W || py < 0 || py >= H) return { x: px, y: py, hit: false };
+        const c = px / CELL | 0, r = py / CELL | 0;
+        if (m[r * COLS + c]) return { x: px, y: py, hit: true };
+      }
+      return { x: x + dx * EYE.range, y: y + dy * EYE.range, hit: false };
+    }
+    function segDist(px, py, ax, ay, bx, by) {
+      const vx = bx - ax, vy = by - ay, l = vx * vx + vy * vy || 1;
+      const t = Phaser.Math.Clamp(((px - ax) * vx + (py - ay) * vy) / l, 0, 1);
+      return Math.hypot(px - ax - vx * t, py - ay - vy * t);
+    }
+    function updateEyes(dt) {
+      const p = player;
+      for (const e of eyes) {
+        e.t += dt;
+        const near = Math.abs(p.x - e.cx) < EYE.wake && Math.abs(p.feet - e.cy) < 420;
+        const toCapo = Math.atan2(p.feet - 35 - e.cy, p.x - e.cx);
+        if (e.state === 'sleep') {
+          if (near && !p.dead) { e.state = 'open'; e.t = -e.offset; }
+        } else if (e.state === 'open') {
+          if (e.type === 'rastreador') e.aim = toCapo;
+          if (e.t >= EYE.open) { e.state = 'charge'; e.t = 0; on('eye-charge'); }
+        } else if (e.state === 'charge') {
+          // El rastreador apunta hasta el 60% de la carga y después queda fijo: el aviso es la trayectoria real.
+          if (e.type === 'rastreador' && e.t < EYE.charge * 0.6) e.aim = Phaser.Math.Angle.RotateTo(e.aim, toCapo, 4 * dt);
+          if (e.type === 'barredor') e.aim = e.base - e.arc / 2;
+          if (e.t >= EYE.charge) { e.state = 'fire'; e.t = 0; on('eye-fire'); }
+        } else if (e.state === 'fire') {
+          if (e.type === 'barredor') e.aim = e.base - e.arc / 2 + e.arc * (e.t / EYE.fire);
+          if (e.t >= EYE.fire) { e.state = 'rest'; e.t = 0; }
+        } else if (e.state === 'rest') {
+          if (e.t >= EYE.rest) { e.state = near ? 'open' : 'sleep'; e.t = 0; }
+        }
+        if (e.type !== 'rastreador' && e.type !== 'barredor') e.aim = e.base;
+        e.end = (e.state === 'charge' || e.state === 'fire') ? castBeam(e.cx, e.cy, e.aim) : null;
+        e.sprite.setFrame(FR[e.state]).setRotation(Math.sin((e.wob += dt * 1.7)) * 0.05);
+
+        if (e.state === 'fire' && e.end && !p.dead) {
+          for (let k = 0; k <= 4; k++) {
+            const by = p.feet - 6 - k * 13;
+            if (segDist(p.x, by, e.cx, e.cy, e.end.x, e.end.y) < 6) { die(); break; }
+          }
+        }
+      }
+    }
+    function drawEyes() {
+      for (const e of eyes) {
+        const firing = e.state === 'fire' && e.end;
+        if (e.beam) e.beam.setVisible(!!firing);
+        if (e.splash) e.splash.setVisible(!!(firing && e.end.hit));
+        if (!e.end) continue;
+        if (e.state === 'charge' && e.t > 0.12) {
+          // Línea de pluma temblorosa: la trayectoria exacta del disparo.
+          const a = Math.min(0.9, 0.3 + e.t / EYE.charge);
+          const len = Math.hypot(e.end.x - e.cx, e.end.y - e.cy), n = Math.max(2, len / 14 | 0);
+          const nx = -(e.end.y - e.cy) / len, ny = (e.end.x - e.cx) / len;
+          fx.lineStyle(1.3, 0x111114, a);
+          fx.beginPath(); fx.moveTo(e.cx, e.cy);
+          for (let i = 1; i <= n; i++) {
+            const t = i / n, j = i < n ? (Math.random() - 0.5) * 1.6 : 0;
+            fx.lineTo(e.cx + (e.end.x - e.cx) * t + nx * j, e.cy + (e.end.y - e.cy) * t + ny * j);
+          }
+          fx.strokePath();
+        } else if (e.state === 'fire') {
+          const f = 1 - Math.max(0, (e.t - EYE.fire + 0.12) / 0.12), w = 6 + Math.random() * 1.5;
+          if (e.beam) {
+            const len = Math.hypot(e.end.x - e.cx, e.end.y - e.cy), grow = Math.min(1, e.t / 0.06);
+            e.beam.setPosition(e.cx, e.cy).setRotation(e.aim).setSize(Math.max(1, len * grow), EYE.beamW)
+              .setScale(1, 0.85 + Math.random() * 0.3).setAlpha(f);
+            e.beam.tilePositionX -= 14;
+            if (e.splash && e.end.hit) {
+              e.splash.setPosition(e.end.x, e.end.y).setRotation(Math.random() * 6.3)
+                .setScale((26 + Math.random() * 8) / e.splash.width).setAlpha(f);
+            }
+            fx.lineStyle(w * 3, 0xff2030, 0.12 * f); fx.lineBetween(e.cx, e.cy, e.end.x, e.end.y);
+            continue;
+          }
+          fx.lineStyle(w * 2.4, 0xff2030, 0.16 * f); fx.lineBetween(e.cx, e.cy, e.end.x, e.end.y);
+          fx.lineStyle(w, 0xc80f1d, 0.95 * f); fx.lineBetween(e.cx, e.cy, e.end.x, e.end.y);
+          fx.lineStyle(2, 0xffd6d6, 0.9 * f); fx.lineBetween(e.cx, e.cy, e.end.x, e.end.y);
+          if (e.end.hit) { fx.fillStyle(0xc80f1d, 0.8 * f); fx.fillCircle(e.end.x, e.end.y, 5 + Math.random() * 3); }
+        }
+      }
+    }
+
+    // Muerte: salpicadura roja, una pausa corta y vuelta al último punto de control.
+    function die() {
+      const p = player;
+      if (p.dead) return;
+      p.dead = 0.75; p.vx = 0; p.vy = 0;
+      dust(p.x, p.feet - 30, 18, 0xc80f1d);
+      scene.cameras.main.shake(180, 0.006);
+      on('die');
+    }
+    function updateCheckpoint() {
+      const L = LEVELS[levelId], cps = (L && L.checkpoints) || [];
+      for (let i = checkpoint + 1; i < cps.length; i++) if (player.x >= cps[i].x * L.grid) checkpoint = i;
     }
 
     /* Plataforma frágil: al pisarla tiembla, se desarma en pedazos que caen y a los pocos segundos vuelve. */
@@ -294,9 +430,11 @@ window.CapoEngine = (function () {
     }
 
     function respawn() {
-      const s = LEVELS[levelId].start;
-      Object.assign(player, { x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0 });
+      const L = LEVELS[levelId], cp = L.checkpoints && L.checkpoints[checkpoint];
+      const s = cp ? { x: (cp.x + 1) * L.grid, y: cp.y * L.grid } : L.start;
+      Object.assign(player, { x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0, dead: 0 });
       resetFragiles();
+      for (const e of eyes) { e.state = 'sleep'; e.t = 0; e.end = null; }
       if (camTarget) { camTarget.setPosition(s.x, s.y - 50); scene.cameras.main.centerOn(s.x, s.y - 50 + insetWorld(playZoom()) / 2); }
     }
 
@@ -324,6 +462,14 @@ window.CapoEngine = (function () {
       const p = player, F = cfg.feel;
 
       updateFragiles(dt);
+      updateEyes(dt);
+      if (p.dead) {
+        p.dead -= dt;
+        if (p.dead <= 0) respawn();
+        draw(dt);
+        return;
+      }
+      updateCheckpoint();
       if (p.dancing) { danceStep(dt); draw(dt); return; }
 
       const ax = (input.r ? 1 : 0) - (input.l ? 1 : 0);
@@ -369,7 +515,7 @@ window.CapoEngine = (function () {
         }
       } else { p.grounded = false; p.feet = nf; }
 
-      if (p.feet > H + 90) respawn();
+      if (p.feet > H + 90) { p.dead = 0.01; respawn(); }
 
       if (p.grounded) {
         p.airT = 0;
@@ -412,6 +558,7 @@ window.CapoEngine = (function () {
       const p = player;
       fx.clear(); dbg.clear();
       camTarget.setPosition(p.x, p.feet - 50);
+      drawEyes();
 
       particles = particles.filter(q => {
         q.t += dt; q.vy += 500 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
@@ -448,7 +595,7 @@ window.CapoEngine = (function () {
 
       const f = frameName();
       const s = cfg.capo.height / 172;
-      capoImg.setFrame(frames[f] ? f : cfg.capo.idle).setVisible(true).setFlipX(p.dir < 0);
+      capoImg.setFrame(frames[f] ? f : cfg.capo.idle).setVisible(!p.dead).setFlipX(p.dir < 0);
       if (p.spin) {
         const q = frames[f] || [0, 0, 0, 120];
         capoImg.setOrigin(0.5, 0.5).setPosition(p.x, p.feet - q[3] * s * 0.5 - 8).setRotation(-p.rot * p.dir);

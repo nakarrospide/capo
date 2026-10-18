@@ -165,6 +165,27 @@
   images.pilar = 'assets/vigilia/pilar.png';
   images.fragil = 'assets/vigilia/fragil.png';
   images.rebote = 'assets/vigilia/rebote.png';
+  images.haz = 'assets/vigilia/haz.png';
+  images.impacto = 'assets/vigilia/impacto.png';
+
+  // Ojos láser. x, y: celda donde nace el tallo (down: cuelga desde arriba).
+  // angle en grados (0 derecha, 90 abajo, 180 izquierda). offset retrasa el primer disparo.
+  const eyes = [
+    // 2. El primer ojo: fijo, a la altura del pecho, se salta o se pasa en el descanso
+    { x: 38.5, y: 16, type: 'fijo', angle: 180 },
+    // 3. Coberturas: rastreador al fondo, los pilares cortan el haz
+    { x: 63.5, y: 16, type: 'rastreador' },
+    // 4. Vertical: cuelga y dispara hacia abajo entre el pad y la cornisa
+    { x: 76, y: 3, down: true, type: 'fijo', angle: 90 },
+    // 5. La estrella: cuatro ojos que apuntan al mismo punto, en secuencia
+    ...[[108, 7], [111, 6], [114, 6], [117, 7]].map(([x, y], i) => ({
+      x, y, type: 'fijo', offset: i * 0.55,
+      angle: Math.atan2((13 - (y - 0.85)) * G, (112.5 - x) * G) * 180 / Math.PI
+    }))
+  ];
+
+  // Puntos de control al empezar cada tramo.
+  const checkpoints = [{ x: 21, y: 16 }, { x: 42, y: 16 }, { x: 67, y: 16 }, { x: 88, y: 16 }];
 
   CapoEngine.LEVELS.vigilia = {
     name: 'Vigilia',
@@ -179,6 +200,9 @@
     ],
     platforms,
     images,
+    sheets: { ojo: { src: 'assets/vigilia/ojo.png', fw: 240, fh: 300, cy: 148 } },
+    eyes,
+    checkpoints,
     paint
   };
 })();

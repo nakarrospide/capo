@@ -21,6 +21,8 @@ src/mesa.js         arranque de la mesa
 assets/levels/      obras (una imagen por nivel, 720×826)
 assets/vigilia/     capas de fondo de Vigilia (lejano y medio)
 tools/prep_fragil.py tramo de la plataforma frágil
+tools/prep_ojo.py    hoja del ojo láser (5 estados)
+tools/prep_laser.py  haz que se repite e impacto
 tools/prep_capa.py  prepara capas nuevas: escala, funde bordes, saca el blanco
 tools/prep_plataformas.py  recorta la hoja de plataformas y el pilar en piezas
 assets/capo/        atlas de poses y frames.json con la posición de cada pose
@@ -40,6 +42,7 @@ Primer nivel armado por piezas en vez de una foto. Mide 120 × 20 celdas de 36 p
 
 - **Fondo:** `lejano.jpg` (parallax 0,12) y `medio.png`, los tallos con ojos dormidos (parallax 0,4, al 70%).
 - **Plataformas:** piezas pintadas (tapas, tres centros, isla, rampas y pilar) recortadas de la hoja con `tools/prep_plataformas.py`. La línea blanca pisable la dibuja el juego encima. Frágil y rebote siguen dibujadas en código. El recorrido de los 5 tramos está en `src/vigilia.js`.
+- **Ojos láser:** dormido, despierto, carga con línea negra de aviso, disparo y descanso. Tipos: fijo, rastreador y barredor. El haz corta en lo sólido, así que los pilares cubren. Si toca a Capo, vuelve al último punto de control.
 - **Probarlo:** `index.html?nivel=vigilia`, o elegir Vigilia en la mesa y pushear.
 
 Para cambiar las plataformas: `python3 tools/prep_plataformas.py hoja.png pilar.png assets/vigilia`.
