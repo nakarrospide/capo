@@ -109,10 +109,19 @@ window.CapoEngine = (function () {
     // El zoom de juego se mide siempre contra el ancho de una obra, así Capo se ve igual en todos los niveles.
     const playZoom = () => viewSize().w * dpr * cfg.camera.zoom / PW;
     const isBuilt = () => !!(LEVELS[levelId] && LEVELS[levelId].built);
+    // Franja inferior tapada por controles flotantes (px CSS). La cámara encuadra en el área que queda libre.
+    const inset = () => Math.max(0, Math.min((opts.bottomInset && opts.bottomInset()) || 0, viewSize().h * 0.6));
     const fullZoom = () => {
-      const v = viewSize();
-      return isBuilt() ? v.h * dpr / H : Math.min(v.w * dpr / W, v.h * dpr / H);
+      const v = viewSize(), h = v.h - inset();
+      return isBuilt() ? h * dpr / H : Math.min(v.w * dpr / W, h * dpr / H);
     };
+    const insetWorld = z => inset() * dpr / z;
+    function playFrame(cam) {
+      const iw = insetWorld(playZoom());
+      cam.setBounds(0, 0, W, H + iw);
+      cam.setFollowOffset(0, -iw / 2);
+      return iw;
+    }
 
     function resize() {
       if (!scene) return;
@@ -120,7 +129,9 @@ window.CapoEngine = (function () {
       game.scale.resize(v.w * dpr, v.h * dpr);
       scene.cameras.main.setSize(v.w * dpr, v.h * dpr);
       styleCanvas();
-      scene.cameras.main.setZoom(player && player.dancing ? fullZoom() : playZoom());
+      const dancing = player && player.dancing;
+      scene.cameras.main.setZoom(dancing ? fullZoom() : playZoom());
+      if (!dancing) playFrame(scene.cameras.main);
     }
 
     function preload() {
@@ -151,7 +162,8 @@ window.CapoEngine = (function () {
         dancing: false, danceT: 0, beat: 0, danceFrame: cfg.capo.dance[0]
       };
       const cam = this.cameras.main;
-      cam.setBounds(0, 0, W, H).setZoom(playZoom()).startFollow(camTarget, true, 0.12, 0.12);
+      cam.setZoom(playZoom()).startFollow(camTarget, true, 0.12, 0.12);
+      playFrame(cam);
       setLevel(levelId);
       ready = true;
       on('ready');
@@ -173,7 +185,7 @@ window.CapoEngine = (function () {
         if (!masks[id]) masks[id] = sampleImage(scene.textures.get('lvl-' + id).getSourceImage());
         setDims(PW, PH);
       }
-      scene.cameras.main.setBounds(0, 0, W, H);
+      playFrame(scene.cameras.main);
       tops = surfaces(masks[id]);
       respawn();
       if (player.dancing) stopDance();
@@ -208,7 +220,7 @@ window.CapoEngine = (function () {
     function respawn() {
       const s = LEVELS[levelId].start;
       Object.assign(player, { x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0 });
-      if (camTarget) { camTarget.setPosition(s.x, s.y - 50); scene.cameras.main.centerOn(s.x, s.y - 50); }
+      if (camTarget) { camTarget.setPosition(s.x, s.y - 50); scene.cameras.main.centerOn(s.x, s.y - 50 + insetWorld(playZoom()) / 2); }
     }
 
     function findSurface(x, from, to) {
@@ -375,7 +387,7 @@ window.CapoEngine = (function () {
       // En una obra se ve el cuadro entero; en un nivel largo, la altura completa alrededor de Capo.
       const vw = viewSize().w * dpr / fullZoom();
       const cx = isBuilt() ? Phaser.Math.Clamp(p.x, vw / 2, W - vw / 2) : W / 2;
-      cam.pan(cx, H / 2, 1400, 'Sine.easeInOut', true);
+      cam.pan(cx, H / 2 + insetWorld(fullZoom()) / 2, 1400, 'Sine.easeInOut', true);
       cam.zoomTo(fullZoom(), 1400, 'Sine.easeInOut', true);
       on('dance', true);
       return true;
@@ -386,9 +398,9 @@ window.CapoEngine = (function () {
       p.dancing = false;
       const cam = scene.cameras.main;
       cam.panEffect.reset();
-      cam.setBounds(0, 0, W, H);
       cam.zoomTo(playZoom(), 800, 'Sine.easeInOut', true);
       cam.startFollow(camTarget, true, 0.08, 0.08);
+      playFrame(cam);
       on('dance', false);
     }
     function danceStep(dt) {
@@ -409,7 +421,7 @@ window.CapoEngine = (function () {
       cfg = next;
       if (!scene) return;
       if (levelChanged) setLevel(cfg.level);
-      if (!player.dancing) scene.cameras.main.setZoom(playZoom());
+      if (!player.dancing) { scene.cameras.main.setZoom(playZoom()); playFrame(scene.cameras.main); }
     }
 
     function setSheet(img, fw, fh, fps) {

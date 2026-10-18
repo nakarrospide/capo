@@ -1,78 +1,79 @@
-/* Consola de bolsillo: carcasa grafito, pantalla con la obra, botones con los colores de las pinturas */
+/* Pantalla completa: la obra ocupa todo y los controles flotan encima */
 :root {
-  --shell: #1b1c21;
-  --shell-hi: #26272e;
-  --screen: #0f1013;
-  --label: #8d8b94;
+  --bg: #0f1013;
   --ink: #ecebe6;
-  --blue: #1d66ad;
-  --orange: #e2531c;
+  --label: #a3a1a8;
+  --btn: rgba(236, 235, 230, 0.88);
+  --btn-on: rgba(255, 255, 255, 1);
+  --btn-shadow: rgba(0, 0, 0, 0.45);
   --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; background: var(--shell); color: var(--ink); overscroll-behavior: none; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); overscroll-behavior: none; overflow: hidden; }
 body {
   font-family: var(--display);
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   touch-action: manipulation;
 }
 [hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.console {
-  height: 100dvh; max-width: 560px; margin: 0 auto;
-  display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) max(14px, env(safe-area-inset-right, 0px))
-           calc(env(safe-area-inset-bottom, 0px) + 14px) max(14px, env(safe-area-inset-left, 0px));
-}
-
-.top { display: flex; align-items: center; gap: 8px; min-height: 32px; }
-.brand { font-weight: 800; letter-spacing: 0.16em; font-size: 15px; }
-.state { font-family: var(--mono); font-size: 12px; color: var(--label); margin-right: auto; }
-.chip {
-  font: 500 12px var(--mono); color: var(--label); background: var(--shell-hi);
-  border: 1px solid #34353d; border-radius: 99px; padding: 6px 11px; text-decoration: none; cursor: pointer;
-}
-.chip.on { color: #fff; background: var(--blue); border-color: transparent; }
-
-.screen {
-  position: relative; min-height: 0; border-radius: 16px; overflow: hidden; background: var(--screen);
-  box-shadow: inset 0 0 0 3px #0a0a0c, 0 1px 0 rgba(255, 255, 255, 0.05);
-}
+.game { position: fixed; inset: 0; height: 100dvh; overflow: hidden; background: var(--bg); }
 .view { position: absolute; inset: 0; }
 .view canvas { display: block; }
 
+/* Pantalla de inicio */
 .start {
-  position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px;
-  background: rgba(15, 16, 19, 0.55); backdrop-filter: blur(2px); cursor: pointer;
+  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; text-align: center; gap: 10px;
+  background: rgba(15, 16, 19, 0.45); cursor: pointer;
+  padding-bottom: 18vh;
 }
-.start-title { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -0.02em; }
-.start-sub { margin: 0; font: 500 14px var(--mono); }
-.start-hint { margin: 10px 0 0; font: 400 12px var(--mono); color: var(--label); }
+.start-title { margin: 0; font-size: clamp(56px, 18vw, 84px); font-weight: 800; letter-spacing: -0.02em; }
+.start-sub { margin: 0; font: 500 clamp(16px, 4.8vw, 20px) var(--mono); }
+.start-hint { margin: 18px 0 0; font: 400 clamp(14px, 4vw, 17px) var(--mono); color: var(--label); }
 
-.controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 6px 0; }
-.dpad { display: flex; gap: 10px; }
-.dpad button {
-  width: 76px; height: 76px; border-radius: 18px; border: 0; cursor: pointer;
-  background: #2c2d35; color: var(--ink); font-size: 22px;
-  box-shadow: 0 4px 0 #111216; touch-action: none;
+/* Banda inferior apenas oscurecida para que los botones se lean sobre cualquier obra */
+.controls {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 22px max(14px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 40px) max(14px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18) 30%);
+  pointer-events: none;
 }
-.dpad button.on { transform: translateY(3px); box-shadow: 0 1px 0 #111216; background: #34353e; }
+.controls button { pointer-events: auto; }
 
-.ab { display: flex; gap: 14px; align-items: flex-end; }
+button {
+  border: 0; padding: 0; margin: 0; cursor: pointer; touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+/* Cruceta */
+.cross {
+  --u: 44px;
+  display: grid; grid-template-columns: repeat(3, var(--u)); grid-template-rows: repeat(3, var(--u));
+  filter: drop-shadow(0 3px 0 var(--btn-shadow));
+}
+.arm { background: var(--btn); display: block; }
+.up    { grid-area: 1 / 2; border-radius: 6px 6px 0 0; }
+.left  { grid-area: 2 / 1; border-radius: 6px 0 0 6px; }
+.mid   { grid-area: 2 / 2; }
+.right { grid-area: 2 / 3; border-radius: 0 6px 6px 0; }
+.down  { grid-area: 3 / 2; border-radius: 0 0 6px 6px; }
+.arm.on { background: var(--btn-on); }
+
+/* A y B: escalonados, A más alto y a la derecha */
+.ab { display: flex; align-items: flex-end; gap: 18px; padding-right: 4px; }
 .round {
-  width: 74px; height: 74px; border-radius: 50%; border: 0; cursor: pointer; color: #fff;
-  display: grid; place-content: center; gap: 0; touch-action: none; box-shadow: 0 4px 0 #111216;
+  width: 68px; height: 68px; border-radius: 50%; background: var(--btn);
+  box-shadow: 0 3px 0 var(--btn-shadow);
 }
-.round span { font-weight: 800; font-size: 22px; line-height: 1; }
-.round small { font: 500 10px var(--mono); opacity: 0.85; }
-.round.a { background: var(--blue); margin-bottom: 26px; }
-.round.b { background: var(--orange); }
-.round.on { transform: translateY(3px); box-shadow: 0 1px 0 #111216; filter: brightness(1.1); }
+.round.a { margin-bottom: 30px; }
+.round.on { background: var(--btn-on); transform: translateY(2px); box-shadow: 0 1px 0 var(--btn-shadow); }
 
-button:focus-visible, a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-@media (min-width: 700px) and (min-height: 700px) {
-  .console { padding-top: 24px; padding-bottom: 24px; }
+@media (max-width: 360px) {
+  .cross { --u: 40px; }
+  .round { width: 60px; height: 60px; }
 }

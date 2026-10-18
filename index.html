@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#1b1c21">
+<meta name="theme-color" content="#0f1013">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Capo</title>
@@ -12,31 +12,30 @@
 <link rel="stylesheet" href="src/game.css">
 </head>
 <body>
-  <main class="console">
-    <header class="top">
-      <span class="brand">CAPO</span>
-      <span class="state" id="state">cargando</span>
-      <button class="chip" id="shakeBtn" hidden>sacudir: off</button>
-      <a class="chip" href="mesa.html">mesa</a>
-    </header>
+  <main class="game">
+    <div class="view" id="view"></div>
 
-    <div class="screen">
-      <div class="view" id="view"></div>
-      <div class="start" id="start">
-        <p class="start-title">Capo</p>
-        <p class="start-sub">Tocá para empezar</p>
-        <p class="start-hint" id="startHint">Sacudí el celular para saltar</p>
-      </div>
+    <div class="start" id="start">
+      <p class="start-title">Capo</p>
+      <p class="start-sub">Tocá para empezar</p>
+      <p class="start-hint" id="startHint">Sacudí el celular para saltar</p>
     </div>
 
+    <!-- El estado y la sacudida siguen vivos para el motor, pero no se muestran en esta iteración -->
+    <span class="sr-only" id="state" aria-live="polite">cargando</span>
+    <button id="shakeBtn" hidden>sacudir: off</button>
+
     <div class="controls">
-      <div class="dpad">
-        <button id="bL" aria-label="Izquierda"><span>◀</span></button>
-        <button id="bR" aria-label="Derecha"><span>▶</span></button>
+      <div class="cross" role="group" aria-label="Dirección">
+        <button id="bU" class="arm up" aria-label="Saltar"></button>
+        <button id="bL" class="arm left" aria-label="Izquierda"></button>
+        <span class="arm mid" aria-hidden="true"></span>
+        <button id="bR" class="arm right" aria-label="Derecha"></button>
+        <span class="arm down" aria-hidden="true"></span>
       </div>
       <div class="ab">
-        <button id="bD" class="round b" aria-label="Bailar"><span>B</span><small>bailar</small></button>
-        <button id="bJ" class="round a" aria-label="Saltar"><span>A</span><small>saltar</small></button>
+        <button id="bD" class="round b" aria-label="Bailar"></button>
+        <button id="bJ" class="round a" aria-label="Saltar"></button>
       </div>
     </div>
   </main>

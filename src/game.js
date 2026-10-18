@@ -10,6 +10,7 @@
     parent: $('view'),
     cfg,
     background: '#0f1013',
+    bottomInset: () => document.querySelector('.controls').getBoundingClientRect().height - 10,
     on(evt, val) {
       if (evt === 'state') stateEl.textContent = val;
       else if (evt === 'bounce') vibrate([12, 30, 12]);
@@ -20,6 +21,8 @@
 
   CapoControls.keyboard(api);
   CapoControls.pad(api, { left: 'bL', right: 'bR', jump: 'bJ', dance: 'bD' });
+  // Arriba en la cruceta también salta.
+  CapoControls.hold($('bU'), () => { api.input.jumpPressed = true; api.input.jump = true; }, () => (api.input.jump = false));
 
   // Más fuerte la sacudida, más alto el salto.
   const shake = CapoControls.shake(() => cfg, (mag, th) => {
