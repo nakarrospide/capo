@@ -2,7 +2,10 @@
 // mueve a Capo con física propia y dibuja sus poses.
 // Lo usan el juego (index.html) y la mesa de trabajo (mesa.html).
 window.CapoEngine = (function () {
-  const W = 720, H = 826, CELL = 4, COLS = W / CELL, ROWS = Math.ceil(H / CELL);
+  // Las obras fotografiadas miden 720×826. Los niveles armados por piezas (built) traen su propio tamaño.
+  const PW = 720, PH = 826, CELL = 4;
+  let W = PW, H = PH, COLS = PW / CELL, ROWS = Math.ceil(PH / CELL);
+  function setDims(w, h) { W = w; H = h; COLS = Math.ceil(w / CELL); ROWS = Math.ceil(h / CELL); }
 
   const LEVELS = {
     color: { src: 'assets/levels/color.jpg', start: { x: 70, y: 690 }, name: 'Líneas de color' },
@@ -12,6 +15,7 @@ window.CapoEngine = (function () {
   // Celdas de 4px marcadas como pintura cuando el color se aleja del papel.
   // 1 = pintura, 2 = pintura azul (rebota).
   function sampleImage(img) {
+    setDims(PW, PH);
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const x = c.getContext('2d');
@@ -32,6 +36,18 @@ window.CapoEngine = (function () {
         if (Math.hypot(R - pr, G - pg, B - pb) > 105) { hit++; if (B > R + 40 && B > G + 10) blue++; }
       }
       if (n && hit / n >= 0.5) m[r * COLS + cc] = blue > hit * 0.5 ? 2 : 1;
+    }
+    return m;
+  }
+
+  // Nivel armado: cada pieza ocupa sus celdas. 2 = rebote.
+  function buildMask(L) {
+    const m = new Uint8Array(COLS * ROWS), g = L.grid / CELL;
+    for (const p of L.platforms) {
+      const v = p.t === 'rebote' ? 2 : 1;
+      const r0 = Math.round(p.y * g), r1 = Math.min(ROWS, Math.round((p.y + (p.h || 1)) * g));
+      const c0 = Math.max(0, Math.round(p.x * g)), c1 = Math.min(COLS, Math.round((p.x + p.w) * g));
+      for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) if (!m[r * COLS + c] || r === r0) m[r * COLS + c] = v;
     }
     return m;
   }
@@ -65,7 +81,8 @@ window.CapoEngine = (function () {
     const input = { l: false, r: false, jump: false, jumpPressed: false };
     let scene, player, fx, dbg, bg, capoImg, camTarget, frames = {};
     let sprite = null, spriteMeta = null;
-    let tops = [], masks = {}, particles = [], showSurf = false, levelId = cfg.level, ready = false;
+    let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [];
+    let levelId = new URLSearchParams(location.search).get('nivel') || cfg.level;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
     function viewSize() {
@@ -89,8 +106,13 @@ window.CapoEngine = (function () {
       game.canvas.style.height = v.h + 'px';
       game.canvas.style.display = 'block';
     }
-    const playZoom = () => viewSize().w * dpr * cfg.camera.zoom / W;
-    const fullZoom = () => { const v = viewSize(); return Math.min(v.w * dpr / W, v.h * dpr / H); };
+    // El zoom de juego se mide siempre contra el ancho de una obra, así Capo se ve igual en todos los niveles.
+    const playZoom = () => viewSize().w * dpr * cfg.camera.zoom / PW;
+    const isBuilt = () => !!(LEVELS[levelId] && LEVELS[levelId].built);
+    const fullZoom = () => {
+      const v = viewSize();
+      return isBuilt() ? v.h * dpr / H : Math.min(v.w * dpr / W, v.h * dpr / H);
+    };
 
     function resize() {
       if (!scene) return;
@@ -102,7 +124,11 @@ window.CapoEngine = (function () {
     }
 
     function preload() {
-      for (const id in LEVELS) this.load.image('lvl-' + id, LEVELS[id].src);
+      for (const id in LEVELS) {
+        const L = LEVELS[id];
+        if (L.built) for (const ly of L.layers) this.load.image('lvl-' + id + '-' + ly.key, ly.src);
+        else this.load.image('lvl-' + id, L.src);
+      }
       this.load.image('capo', 'assets/capo/atlas.png');
       this.load.json('capo-frames', 'assets/capo/frames.json');
     }
@@ -113,10 +139,11 @@ window.CapoEngine = (function () {
       frames = this.cache.json.get('capo-frames') || {};
       const tex = this.textures.get('capo');
       for (const n in frames) { const q = frames[n]; tex.add(n, 0, q[0], q[1], q[2], q[3]); }
-      bg = this.add.image(0, 0, 'lvl-' + levelId).setOrigin(0).setDisplaySize(W, H);
-      dbg = this.add.graphics();
-      fx = this.add.graphics();
-      capoImg = this.add.image(0, 0, 'capo', cfg.capo.idle).setOrigin(0.5, 1);
+      const firstPhoto = Object.keys(LEVELS).find(k => !LEVELS[k].built);
+      bg = this.add.image(0, 0, 'lvl-' + firstPhoto).setOrigin(0).setDisplaySize(PW, PH).setDepth(-30);
+      dbg = this.add.graphics().setDepth(10);
+      fx = this.add.graphics().setDepth(11);
+      capoImg = this.add.image(0, 0, 'capo', cfg.capo.idle).setOrigin(0.5, 1).setDepth(12);
       camTarget = this.add.zone(0, 0, 1, 1);
       player = {
         x: 0, feet: 0, vx: 0, vy: 0, grounded: false, coyote: 0, buffer: 0, dir: 1, phase: 0,
@@ -134,11 +161,48 @@ window.CapoEngine = (function () {
       if (!LEVELS[id]) id = 'color';
       levelId = id;
       if (!scene) return;
-      bg.setTexture('lvl-' + id).setDisplaySize(W, H);
-      if (!masks[id]) masks[id] = sampleImage(scene.textures.get('lvl-' + id).getSourceImage());
+      built.forEach(o => o.destroy()); built = [];
+      const L = LEVELS[id];
+      if (L.built) {
+        setDims(L.w, L.h);
+        bg.setVisible(false);
+        buildScene(id, L);
+        if (!masks[id]) masks[id] = buildMask(L);
+      } else {
+        bg.setVisible(true).setTexture('lvl-' + id).setDisplaySize(PW, PH);
+        if (!masks[id]) masks[id] = sampleImage(scene.textures.get('lvl-' + id).getSourceImage());
+        setDims(PW, PH);
+      }
+      scene.cameras.main.setBounds(0, 0, W, H);
       tops = surfaces(masks[id]);
       respawn();
       if (player.dancing) stopDance();
+    }
+
+    // Capas de fondo con parallax y las plataformas pintadas en canvas.
+    // Las plataformas se parten en tiras de 1440 px porque varios celulares no aceptan texturas de más de 4096.
+    function buildScene(id, L) {
+      L.layers.forEach((ly, i) => {
+        const key = 'lvl-' + id + '-' + ly.key;
+        const src = scene.textures.get(key).getSourceImage();
+        const t = scene.add.tileSprite(0, ly.bottom - ly.height, W, ly.height, key)
+          .setOrigin(0).setTileScale(ly.height / src.height)
+          .setScrollFactor(ly.parallax, 1).setAlpha(ly.alpha == null ? 1 : ly.alpha).setDepth(-20 + i);
+        built.push(t);
+      });
+      const STRIP = 1440;
+      for (let x0 = 0; x0 < W; x0 += STRIP) {
+        const key = 'plat-' + id + '-' + x0;
+        if (!scene.textures.exists(key)) {
+          const c = document.createElement('canvas');
+          c.width = Math.min(STRIP, W - x0); c.height = H;
+          const ctx = c.getContext('2d');
+          ctx.translate(-x0, 0);
+          L.paint(ctx);
+          scene.textures.addCanvas(key, c);
+        }
+        built.push(scene.add.image(x0, 0, key).setOrigin(0).setDepth(-5));
+      }
     }
 
     function respawn() {
@@ -308,7 +372,10 @@ window.CapoEngine = (function () {
       const cam = scene.cameras.main;
       cam.stopFollow();
       cam.removeBounds(); // sin límites la obra queda centrada con bandas parejas arriba y abajo
-      cam.pan(W / 2, H / 2, 1400, 'Sine.easeInOut', true);
+      // En una obra se ve el cuadro entero; en un nivel largo, la altura completa alrededor de Capo.
+      const vw = viewSize().w * dpr / fullZoom();
+      const cx = isBuilt() ? Phaser.Math.Clamp(p.x, vw / 2, W - vw / 2) : W / 2;
+      cam.pan(cx, H / 2, 1400, 'Sine.easeInOut', true);
       cam.zoomTo(fullZoom(), 1400, 'Sine.easeInOut', true);
       on('dance', true);
       return true;

@@ -15,9 +15,12 @@ config.json         ajustes base del juego
 src/config.js       carga config.json y los ajustes pusheados desde la mesa
 src/engine.js       motor: superficies a partir de la imagen, física, poses de Capo, baile
 src/controls.js     teclado, botones táctiles y sacudir el celular
+src/vigilia.js      nivel Vigilia: capas de fondo, plataformas y recorrido
 src/game.js         arranque del juego
 src/mesa.js         arranque de la mesa
 assets/levels/      obras (una imagen por nivel, 720×826)
+assets/vigilia/     capas de fondo de Vigilia (lejano y medio)
+tools/prep_capa.py  prepara capas nuevas: escala, funde bordes, saca el blanco
 assets/capo/        atlas de poses y frames.json con la posición de cada pose
 ```
 
@@ -28,6 +31,16 @@ assets/capo/        atlas de poses y frames.json con la posición de cada pose
 3. Sumarla en `LEVELS` dentro de `src/engine.js` con su punto de inicio.
 
 Las superficies se sacan solas: todo lo que se aleja del color del papel se puede pisar, y lo azul rebota.
+
+## Vigilia
+
+Primer nivel armado por piezas en vez de una foto. Mide 120 × 20 celdas de 36 px.
+
+- **Fondo:** `lejano.jpg` (parallax 0,12) y `medio.png`, los tallos con ojos dormidos (parallax 0,4, al 70%).
+- **Plataformas:** por ahora dibujadas en código, hasta que llegue la hoja pintada. El recorrido de los 5 tramos está en `src/vigilia.js`.
+- **Probarlo:** `index.html?nivel=vigilia`, o elegir Vigilia en la mesa y pushear.
+
+Para cambiar una capa: `python3 tools/prep_capa.py lejano foto.png assets/vigilia/lejano.jpg 720` (o `medio … 560`).
 
 ## Poses de Capo
 
