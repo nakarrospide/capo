@@ -20,6 +20,7 @@ src/game.js         arranque del juego
 src/mesa.js         arranque de la mesa
 assets/levels/      obras (una imagen por nivel, 720×826)
 assets/vigilia/     capas de fondo de Vigilia (lejano y medio)
+tools/prep_fragil.py tramo de la plataforma frágil
 tools/prep_capa.py  prepara capas nuevas: escala, funde bordes, saca el blanco
 tools/prep_plataformas.py  recorta la hoja de plataformas y el pilar en piezas
 assets/capo/        atlas de poses y frames.json con la posición de cada pose

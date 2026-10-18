@@ -1,6 +1,7 @@
 // Vigilia: primer nivel armado por piezas (no sale de una foto).
 // Fondo en dos capas con parallax y plataformas armadas con las piezas pintadas
-// (tools/prep_plataformas.py las recorta de la hoja). Frágil y rebote siguen dibujadas en código.
+// (tools/prep_plataformas.py las recorta de la hoja). La frágil es pintada y se desarma al pisarla;
+// el rebote es el pad azul pintado.
 // Las medidas van en celdas de 36 px: Capo ocupa unas 2 de alto.
 (function () {
   const G = 36;
@@ -111,8 +112,15 @@
     ctx.restore();
   }
 
-  function bounce(ctx, r, p) {
+  // Pad azul pintado. 42 = fila del borde pisable en rebote.png (el centro de la curva).
+  const REBOTE_TOP = 42;
+  function bounce(ctx, r, p, im) {
     const X = p.x * G, Y = p.y * G, Wp = p.w * G, Hp = p.h * G;
+    if (im && im.rebote) {
+      const w = Wp + 12, s = w / im.rebote.width;
+      ctx.drawImage(im.rebote, X - 6, Y - REBOTE_TOP * s, w, im.rebote.height * s);
+      return;
+    }
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(X, Y + 4);
@@ -146,8 +154,8 @@
     platforms.map((p, i) => [p, i]).sort((a, b) => order[a[0].t] - order[b[0].t]).forEach(([p, i]) => {
       const r = rng(i + 7);
       if (p.t === 'pilar') pillar(ctx, r, p, im);
-      else if (p.t === 'fragil') fragile(ctx, r, p);
-      else if (p.t === 'rebote') bounce(ctx, r, p);
+      else if (p.t === 'fragil') { if (!im.fragil) fragile(ctx, r, p); } // con la pieza pintada la arma el motor
+      else if (p.t === 'rebote') bounce(ctx, r, p, im);
       else ridge(ctx, r, p, im);
     });
   }
@@ -155,6 +163,8 @@
   const images = {};
   for (const n of ['izq', 'med1', 'med2', 'med3', 'der', 'isla', 'sube', 'baja']) images[n] = `assets/vigilia/plat_${n}.png`;
   images.pilar = 'assets/vigilia/pilar.png';
+  images.fragil = 'assets/vigilia/fragil.png';
+  images.rebote = 'assets/vigilia/rebote.png';
 
   CapoEngine.LEVELS.vigilia = {
     name: 'Vigilia',

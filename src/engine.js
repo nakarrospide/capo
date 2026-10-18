@@ -44,6 +44,7 @@ window.CapoEngine = (function () {
   function buildMask(L) {
     const m = new Uint8Array(COLS * ROWS), g = L.grid / CELL;
     for (const p of L.platforms) {
+      if (p.t === 'fragil') continue; // las frágiles se manejan aparte: aparecen y desaparecen
       const v = p.t === 'rebote' ? 2 : 1;
       const r0 = Math.round(p.y * g), r1 = Math.min(ROWS, Math.round((p.y + (p.h || 1)) * g));
       const c0 = Math.max(0, Math.round(p.x * g)), c1 = Math.min(COLS, Math.round((p.x + p.w) * g));
@@ -81,7 +82,7 @@ window.CapoEngine = (function () {
     const input = { l: false, r: false, jump: false, jumpPressed: false };
     let scene, player, fx, dbg, bg, capoImg, camTarget, frames = {};
     let sprite = null, spriteMeta = null;
-    let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [];
+    let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [], fragiles = [];
     let levelId = new URLSearchParams(location.search).get('nivel') || cfg.level;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
@@ -176,7 +177,7 @@ window.CapoEngine = (function () {
       if (!LEVELS[id]) id = 'color';
       levelId = id;
       if (!scene) return;
-      built.forEach(o => o.destroy()); built = [];
+      built.forEach(o => o.destroy()); built = []; fragiles = [];
       const L = LEVELS[id];
       if (L.built) {
         setDims(L.w, L.h);
@@ -221,11 +222,81 @@ window.CapoEngine = (function () {
         }
         built.push(scene.add.image(x0, 0, key).setOrigin(0).setDisplaySize(sw, H).setDepth(-5));
       }
+      const fkey = 'lvl-' + id + '-img-fragil';
+      if (scene.textures.exists(fkey)) for (const p of L.platforms) if (p.t === 'fragil') makeFragile(p, L.grid, fkey);
+    }
+
+    /* Plataforma frágil: al pisarla tiembla, se desarma en pedazos que caen y a los pocos segundos vuelve. */
+    const FRAG = { shake: 0.5, gone: 3, fade: 0.4, slices: 6 };
+    function makeFragile(p, G, key) {
+      const x = p.x * G, y = p.y * G, w = p.w * G;
+      const src = scene.textures.get(key).getSourceImage();
+      const pad = 6, sc = (w + pad * 2) / src.width;
+      const box = scene.add.container(x - pad, y).setDepth(-4);
+      const img = scene.add.image(0, 0, key).setOrigin(0).setScale(sc);
+      const dash = scene.add.graphics();
+      dash.fillStyle(0xffffff, 0.92);
+      for (let dx = pad + 3; dx < pad + w - 4; dx += 9) dash.fillRect(dx, 1, 5, 1.6);
+      box.add([img, dash]);
+      built.push(box);
+      fragiles.push({ x0: x, x1: x + w, y, w, key, sc, pad, box, state: 'idle', t: 0, bits: [] });
+    }
+    function fragileAt(x, from, to) {
+      for (const f of fragiles) {
+        if (f.state !== 'idle' && f.state !== 'shake') continue;
+        if (x + 6 >= f.x0 && x - 6 <= f.x1 && f.y >= from && f.y <= to) return f;
+      }
+      return null;
+    }
+    function breakFragile(f) {
+      f.state = 'gone'; f.t = 0;
+      f.box.setVisible(false).setX(f.x0 - f.pad);
+      const src = scene.textures.get(f.key).getSourceImage(), n = FRAG.slices, sw = src.width / n;
+      for (let i = 0; i < n; i++) {
+        const b = scene.add.image(f.x0 - f.pad + (i * sw + sw / 2) * f.sc, f.y + src.height * f.sc / 2, f.key)
+          .setScale(f.sc).setCrop(i * sw, 0, sw, src.height).setDepth(-4);
+        b.setOrigin((i * sw + sw / 2) / src.width, 0.5);
+        f.bits.push({ o: b, vy: -30 - Math.random() * 60, vx: (Math.random() - 0.5) * 50, vr: (Math.random() - 0.5) * 4, delay: Math.random() * 0.15 });
+      }
+      dust((f.x0 + f.x1) / 2, f.y, 8, 0x8a3a78);
+      on('crumble');
+    }
+    function resetFragiles() {
+      for (const f of fragiles) {
+        f.bits.forEach(b => b.o.destroy()); f.bits = [];
+        f.state = 'idle'; f.t = 0; f.box.setVisible(true).setAlpha(1).setX(f.x0 - f.pad);
+      }
+    }
+    function updateFragiles(dt) {
+      const p = player;
+      for (const f of fragiles) {
+        f.t += dt;
+        if (f.state === 'shake') {
+          f.box.setX(f.x0 - f.pad + Math.sin(f.t * 70) * 1.6 * (0.5 + f.t / FRAG.shake));
+          if (f.t >= FRAG.shake) breakFragile(f);
+        } else if (f.state === 'gone') {
+          f.bits = f.bits.filter(b => {
+            if (f.t < b.delay) return true;
+            b.vy += 900 * dt;
+            b.o.x += b.vx * dt; b.o.y += b.vy * dt; b.o.rotation += b.vr * dt;
+            b.o.setAlpha(Math.max(0, 1 - (f.t - 0.5) / 0.7));
+            if (f.t > 1.3) { b.o.destroy(); return false; }
+            return true;
+          });
+          // Vuelve solo si Capo no está metido donde se arma.
+          const inside = p.x + 8 > f.x0 && p.x - 8 < f.x1 && p.feet > f.y - 70 && p.feet < f.y + 30;
+          if (f.t >= FRAG.gone && !inside) { f.state = 'back'; f.t = 0; f.box.setVisible(true).setAlpha(0); }
+        } else if (f.state === 'back') {
+          f.box.setAlpha(Math.min(1, f.t / FRAG.fade));
+          if (f.t >= FRAG.fade) { f.state = 'idle'; f.t = 0; }
+        }
+      }
     }
 
     function respawn() {
       const s = LEVELS[levelId].start;
       Object.assign(player, { x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0 });
+      resetFragiles();
       if (camTarget) { camTarget.setPosition(s.x, s.y - 50); scene.cameras.main.centerOn(s.x, s.y - 50 + insetWorld(playZoom()) / 2); }
     }
 
@@ -235,6 +306,8 @@ window.CapoEngine = (function () {
       for (let c = c0; c <= c1; c++) for (const s of tops[c]) {
         if (s.y >= from && s.y <= to && (!best || s.y < best.y)) best = s;
       }
+      const f = fragileAt(x, from, to);
+      if (f && (!best || f.y < best.y)) best = { y: f.y, b: false, frag: f };
       return best;
     }
 
@@ -250,6 +323,7 @@ window.CapoEngine = (function () {
       const dt = Math.min(deltaMs / 1000, 1 / 30);
       const p = player, F = cfg.feel;
 
+      updateFragiles(dt);
       if (p.dancing) { danceStep(dt); draw(dt); return; }
 
       const ax = (input.r ? 1 : 0) - (input.l ? 1 : 0);
@@ -288,6 +362,7 @@ window.CapoEngine = (function () {
               if (impact > 260) { dust(p.x, s.y, Math.min(12, impact / 80 | 0)); on('land', impact); }
             }
           } else { p.feet = s.y; p.vy = 0; }
+          if (p.grounded && s.frag && s.frag.state === 'idle') { s.frag.state = 'shake'; s.frag.t = 0; on('crack'); }
         } else {
           if (p.grounded) p.coyote = cfg.feel.coyote / 1000;
           p.grounded = false; p.feet = nf;
@@ -349,6 +424,9 @@ window.CapoEngine = (function () {
       if (showSurf) {
         for (let c = 0; c < COLS; c++) for (const s of tops[c]) {
           dbg.fillStyle(s.b ? 0x1d66ad : 0xff2d55, 0.85); dbg.fillRect(c * CELL, s.y - 1, CELL, 2);
+        }
+        for (const f of fragiles) if (f.state === 'idle' || f.state === 'shake') {
+          dbg.fillStyle(0xffb000, 0.9); dbg.fillRect(f.x0, f.y - 1, f.w, 2);
         }
       }
 

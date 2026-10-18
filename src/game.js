@@ -29,6 +29,7 @@
     on(evt, val) {
       if (evt === 'state') stateEl.textContent = val;
       else if (evt === 'bounce') vibrate([12, 30, 12]);
+      else if (evt === 'crack') vibrate(6);
       else if (evt === 'land' && val > 520) vibrate(10);
       else if (evt === 'dance') { $('bD').classList.toggle('on', val); $('zD').classList.toggle('on', val); }
     }
