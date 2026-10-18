@@ -109,16 +109,16 @@ window.CapoEngine = (function () {
     // El zoom de juego se mide siempre contra el ancho de una obra, así Capo se ve igual en todos los niveles.
     const playZoom = () => viewSize().w * dpr * cfg.camera.zoom / PW;
     const isBuilt = () => !!(LEVELS[levelId] && LEVELS[levelId].built);
-    // Franja inferior tapada por controles flotantes (px CSS). La cámara encuadra en el área que queda libre.
+    // Franja inferior tapada por controles flotantes (px CSS). La cámara sube a Capo hacia el área libre, sin salirse de la obra.
     const inset = () => Math.max(0, Math.min((opts.bottomInset && opts.bottomInset()) || 0, viewSize().h * 0.6));
     const fullZoom = () => {
-      const v = viewSize(), h = v.h - inset();
+      const v = viewSize(), h = v.h;
       return isBuilt() ? h * dpr / H : Math.min(v.w * dpr / W, h * dpr / H);
     };
     const insetWorld = z => inset() * dpr / z;
     function playFrame(cam) {
       const iw = insetWorld(playZoom());
-      cam.setBounds(0, 0, W, H + iw);
+      cam.setBounds(0, 0, W, H); // la obra llega hasta el borde: nunca se ve fondo negro
       cam.setFollowOffset(0, -iw / 2);
       return iw;
     }
@@ -393,7 +393,7 @@ window.CapoEngine = (function () {
       // En una obra se ve el cuadro entero; en un nivel largo, la altura completa alrededor de Capo.
       const vw = viewSize().w * dpr / fullZoom();
       const cx = isBuilt() ? Phaser.Math.Clamp(p.x, vw / 2, W - vw / 2) : W / 2;
-      cam.pan(cx, H / 2 + insetWorld(fullZoom()) / 2, 1400, 'Sine.easeInOut', true);
+      cam.pan(cx, H / 2, 1400, 'Sine.easeInOut', true);
       cam.zoomTo(fullZoom(), 1400, 'Sine.easeInOut', true);
       on('dance', true);
       return true;

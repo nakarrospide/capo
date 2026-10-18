@@ -1,11 +1,12 @@
-/* Pantalla completa: la obra ocupa todo y los controles flotan encima */
+/* Pantalla completa: la obra llega a todos los bordes y los controles son vidrio encima */
 :root {
   --bg: #0f1013;
   --ink: #ecebe6;
-  --label: #a3a1a8;
-  --btn: rgba(236, 235, 230, 0.88);
-  --btn-on: rgba(255, 255, 255, 1);
-  --btn-shadow: rgba(0, 0, 0, 0.45);
+  --label: #d9d7d0;
+  --glass: rgba(255, 255, 255, 0.16);
+  --glass-on: rgba(255, 255, 255, 0.42);
+  --glass-line: rgba(255, 255, 255, 0.55);
+  --glass-blur: blur(10px) saturate(1.3);
   --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
@@ -15,7 +16,7 @@ html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); 
 body {
   font-family: var(--display);
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  touch-action: manipulation;
+  touch-action: none;
 }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -24,56 +25,108 @@ body {
 .view { position: absolute; inset: 0; }
 .view canvas { display: block; }
 
-/* Pantalla de inicio */
-.start {
-  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; text-align: center; gap: 10px;
-  background: rgba(15, 16, 19, 0.45); cursor: pointer;
-  padding-bottom: 18vh;
-}
-.start-title { margin: 0; font-size: clamp(56px, 18vw, 84px); font-weight: 800; letter-spacing: -0.02em; }
-.start-sub { margin: 0; font: 500 clamp(16px, 4.8vw, 20px) var(--mono); }
-.start-hint { margin: 18px 0 0; font: 400 clamp(14px, 4vw, 17px) var(--mono); color: var(--label); }
-
-/* Banda inferior apenas oscurecida para que los botones se lean sobre cualquier obra */
-.controls {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-  display: flex; align-items: flex-end; justify-content: space-between;
-  padding: 22px max(14px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 40px) max(14px, env(safe-area-inset-left, 0px));
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.18) 30%);
-  pointer-events: none;
-}
-.controls button { pointer-events: auto; }
-
 button {
-  border: 0; padding: 0; margin: 0; cursor: pointer; touch-action: none;
+  border: 0; padding: 0; margin: 0; cursor: pointer; touch-action: none; color: inherit; font: inherit;
   -webkit-tap-highlight-color: transparent;
 }
 button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
-/* Cruceta */
-.cross {
-  --u: 44px;
-  display: grid; grid-template-columns: repeat(3, var(--u)); grid-template-rows: repeat(3, var(--u));
-  filter: drop-shadow(0 3px 0 var(--btn-shadow));
+/* Vidrio: deja ver la obra difuminada detrás */
+.glass, .round, .cross-glass, .stick, .ui-swap {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
 }
-.arm { background: var(--btn); display: block; }
-.up    { grid-area: 1 / 2; border-radius: 6px 6px 0 0; }
-.left  { grid-area: 2 / 1; border-radius: 6px 0 0 6px; }
-.mid   { grid-area: 2 / 2; }
-.right { grid-area: 2 / 3; border-radius: 0 6px 6px 0; }
-.down  { grid-area: 3 / 2; border-radius: 0 0 6px 6px; }
-.arm.on { background: var(--btn-on); }
 
-/* A y B: escalonados, A más alto y a la derecha */
-.ab { display: flex; align-items: flex-end; gap: 18px; padding-right: 4px; }
-.round {
-  width: 68px; height: 68px; border-radius: 50%; background: var(--btn);
-  box-shadow: 0 3px 0 var(--btn-shadow);
+/* Onda al tocar */
+.ripple {
+  position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85); pointer-events: none;
+  animation: ripple 420ms cubic-bezier(.2, .7, .3, 1) forwards;
 }
-.round.a { margin-bottom: 30px; }
-.round.on { background: var(--btn-on); transform: translateY(2px); box-shadow: 0 1px 0 var(--btn-shadow); }
+@keyframes ripple { to { transform: scale(7); opacity: 0; } }
+
+/* ---------- UI 1: botones ---------- */
+.pad {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 max(18px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 34px) max(18px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.pad > * { pointer-events: auto; }
+
+.cross { position: relative; width: 132px; height: 132px; touch-action: none; }
+/* Área de toque más grande que el dibujo, para pulgares imprecisos */
+.cross::before { content: ""; position: absolute; inset: -18px; }
+.cross-glass {
+  position: absolute; inset: 0;
+  clip-path: polygon(33.33% 0, 66.67% 0, 66.67% 33.33%, 100% 33.33%, 100% 66.67%, 66.67% 66.67%, 66.67% 100%, 33.33% 100%, 33.33% 66.67%, 0 66.67%, 0 33.33%, 33.33% 33.33%);
+  transform: translate(var(--tx, 0), var(--ty, 0));
+  transition: transform 90ms ease-out;
+}
+.cross-line {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+  fill: none; stroke: var(--glass-line); stroke-width: 1.5; stroke-linejoin: round;
+  transform: translate(var(--tx, 0), var(--ty, 0)); transition: transform 90ms ease-out;
+}
+.arm { position: absolute; width: 33.34%; height: 33.34%; transition: background 80ms; }
+.arm.up { left: 33.33%; top: 0; }
+.arm.left { left: 0; top: 33.33%; }
+.arm.right { right: 0; top: 33.33%; }
+.arm.down { left: 33.33%; bottom: 0; }
+.cross.on-u .arm.up, .cross.on-l .arm.left, .cross.on-r .arm.right { background: var(--glass-on); }
+
+.ab { display: flex; align-items: flex-end; gap: 20px; }
+.round {
+  position: relative; overflow: hidden; width: 70px; height: 70px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--glass-line), 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 90ms ease-out, background 80ms;
+}
+.round::before { content: ""; position: absolute; inset: -14px; border-radius: 50%; }
+.round.a { margin-bottom: 34px; }
+.round.on { transform: scale(0.9); background: var(--glass-on); }
+
+/* ---------- UI 2: zonas ---------- */
+.zones { position: absolute; inset: 0; z-index: 2; touch-action: none; overflow: hidden; }
+.stick {
+  position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--glass-line);
+  opacity: 0; transform: scale(0.7); transition: opacity 120ms, transform 120ms;
+  pointer-events: none;
+}
+.stick.show { opacity: 1; transform: scale(1); }
+.knob {
+  position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.round.small { width: 46px; height: 46px; }
+.dance-ghost {
+  position: absolute; z-index: 3;
+  right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 34px);
+}
+
+.game[data-ui="botones"] .zones, .game[data-ui="botones"] .dance-ghost { display: none; }
+.game[data-ui="zonas"] .pad { display: none; }
+
+/* Cambiar de UI mientras exploramos */
+.ui-swap {
+  position: absolute; z-index: 5; width: 38px; height: 38px; border-radius: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(14px, env(safe-area-inset-right, 0px));
+  display: grid; place-content: center; opacity: 0.75;
+  box-shadow: inset 0 0 0 1px var(--glass-line);
+}
+.ui-swap svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Inicio */
+.start {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-content: center; text-align: center; gap: 10px;
+  background: rgba(15, 16, 19, 0.4); cursor: pointer; padding: 0 24px 16vh;
+}
+.start-title { margin: 0; font-size: clamp(56px, 18vw, 84px); font-weight: 800; letter-spacing: -0.02em; }
+.start-sub { margin: 0; font: 500 clamp(16px, 4.8vw, 20px) var(--mono); }
+.start-hint { margin: 8px 0 0; font: 400 clamp(13px, 3.8vw, 16px) var(--mono); color: var(--label); opacity: 0.8; }
+#uiHint { margin-top: 18px; white-space: pre-line; line-height: 1.5; }
 
 @media (max-width: 360px) {
-  .cross { --u: 40px; }
-  .round { width: 60px; height: 60px; }
+  .cross { width: 120px; height: 120px; }
+  .round { width: 62px; height: 62px; }
 }
