@@ -21,6 +21,7 @@ src/mesa.js         arranque de la mesa
 assets/levels/      obras (una imagen por nivel, 720×826)
 assets/vigilia/     capas de fondo de Vigilia (lejano y medio)
 tools/prep_capa.py  prepara capas nuevas: escala, funde bordes, saca el blanco
+tools/prep_plataformas.py  recorta la hoja de plataformas y el pilar en piezas
 assets/capo/        atlas de poses y frames.json con la posición de cada pose
 ```
 
@@ -37,8 +38,10 @@ Las superficies se sacan solas: todo lo que se aleja del color del papel se pued
 Primer nivel armado por piezas en vez de una foto. Mide 120 × 20 celdas de 36 px.
 
 - **Fondo:** `lejano.jpg` (parallax 0,12) y `medio.png`, los tallos con ojos dormidos (parallax 0,4, al 70%).
-- **Plataformas:** por ahora dibujadas en código, hasta que llegue la hoja pintada. El recorrido de los 5 tramos está en `src/vigilia.js`.
+- **Plataformas:** piezas pintadas (tapas, tres centros, isla, rampas y pilar) recortadas de la hoja con `tools/prep_plataformas.py`. La línea blanca pisable la dibuja el juego encima. Frágil y rebote siguen dibujadas en código. El recorrido de los 5 tramos está en `src/vigilia.js`.
 - **Probarlo:** `index.html?nivel=vigilia`, o elegir Vigilia en la mesa y pushear.
+
+Para cambiar las plataformas: `python3 tools/prep_plataformas.py hoja.png pilar.png assets/vigilia`.
 
 Para cambiar una capa: `python3 tools/prep_capa.py lejano foto.png assets/vigilia/lejano.jpg 720` (o `medio … 560`).
 

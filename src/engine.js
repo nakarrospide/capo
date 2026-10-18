@@ -137,7 +137,10 @@ window.CapoEngine = (function () {
     function preload() {
       for (const id in LEVELS) {
         const L = LEVELS[id];
-        if (L.built) for (const ly of L.layers) this.load.image('lvl-' + id + '-' + ly.key, ly.src);
+        if (L.built) {
+          for (const ly of L.layers) this.load.image('lvl-' + id + '-' + ly.key, ly.src);
+          for (const n in L.images || {}) this.load.image('lvl-' + id + '-img-' + n, L.images[n]);
+        }
         else this.load.image('lvl-' + id, L.src);
       }
       this.load.image('capo', 'assets/capo/atlas.png');
@@ -202,18 +205,21 @@ window.CapoEngine = (function () {
           .setScrollFactor(ly.parallax, 1).setAlpha(ly.alpha == null ? 1 : ly.alpha).setDepth(-20 + i);
         built.push(t);
       });
-      const STRIP = 1440;
+      // Se pinta al doble de resolución porque la cámara de juego acerca bastante.
+      const STRIP = 1440, RES = 2, imgs = {};
+      for (const n in L.images || {}) imgs[n] = scene.textures.get('lvl-' + id + '-img-' + n).getSourceImage();
       for (let x0 = 0; x0 < W; x0 += STRIP) {
-        const key = 'plat-' + id + '-' + x0;
+        const key = 'plat-' + id + '-' + x0, sw = Math.min(STRIP, W - x0);
         if (!scene.textures.exists(key)) {
           const c = document.createElement('canvas');
-          c.width = Math.min(STRIP, W - x0); c.height = H;
+          c.width = sw * RES; c.height = H * RES;
           const ctx = c.getContext('2d');
+          ctx.scale(RES, RES);
           ctx.translate(-x0, 0);
-          L.paint(ctx);
+          L.paint(ctx, imgs);
           scene.textures.addCanvas(key, c);
         }
-        built.push(scene.add.image(x0, 0, key).setOrigin(0).setDepth(-5));
+        built.push(scene.add.image(x0, 0, key).setOrigin(0).setDisplaySize(sw, H).setDepth(-5));
       }
     }
 

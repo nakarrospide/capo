@@ -1,6 +1,6 @@
 // Vigilia: primer nivel armado por piezas (no sale de una foto).
-// Fondo en dos capas con parallax y plataformas dibujadas en código como provisorias,
-// hasta que llegue la hoja de plataformas pintada.
+// Fondo en dos capas con parallax y plataformas armadas con las piezas pintadas
+// (tools/prep_plataformas.py las recorta de la hoja). Frágil y rebote siguen dibujadas en código.
 // Las medidas van en celdas de 36 px: Capo ocupa unas 2 de alto.
 (function () {
   const G = 36;
@@ -23,7 +23,6 @@
     // 4. Vertical
     { t: 'plt', x: 67, y: 16, w: 5, h: 4 },
     { t: 'rebote', x: 72, y: 16, w: 3, h: 1 },
-    { t: 'plt', x: 72, y: 17, w: 3, h: 3 },
     { t: 'plt', x: 77, y: 10, w: 6, h: 2 },
     { t: 'fragil', x: 84, y: 13, w: 3, h: 1 },
     // 5. La estrella
@@ -57,52 +56,42 @@
     ctx.stroke();
   }
 
-  // Cresta rasgada: cuerpo magenta que se deshace hacia abajo en goteo.
-  function ridge(ctx, r, p, cols, solid) {
-    const X = p.x * G, Y = p.y * G, Wp = p.w * G, Hp = p.h * G;
-    ctx.beginPath();
-    ctx.moveTo(X, Y);
-    for (let px = X; px <= X + Wp; px += 6) ctx.lineTo(px, Y - r() * 3);
-    let py = Y;
-    while (py < Y + Hp) { py += 8 + r() * 10; ctx.lineTo(X + Wp + (r() - 0.6) * 8, Math.min(py, Y + Hp)); }
-    for (let px = X + Wp; px >= X; px -= 10 + r() * 14) {
-      ctx.lineTo(px, Y + Hp + (r() < 0.35 ? r() * 42 : r() * 10));
-      ctx.lineTo(px - 4, Y + Hp - r() * 12);
-    }
-    py = Y + Hp;
-    while (py > Y) { py -= 8 + r() * 10; ctx.lineTo(X + (r() - 0.4) * 8, Math.max(Y, py)); }
-    ctx.closePath();
+  // Pieza pintada escalada al ancho pedido, con el borde pisable arriba.
+  function piece(ctx, img, x, y, w, sx, sw) {
+    const s = w / (sw || img.width);
+    ctx.drawImage(img, sx || 0, 0, sw || img.width, img.height, x, y, w, img.height * s);
+  }
 
-    const g = ctx.createLinearGradient(0, Y, 0, Y + Hp + 40);
-    g.addColorStop(0, cols[0]);
-    g.addColorStop(0.55, cols[1]);
-    g.addColorStop(1, solid ? cols[1] : 'rgba(110,50,80,0)');
-    ctx.save();
-    ctx.globalAlpha = solid ? 1 : 0.93;
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.clip();
-    for (let i = 0; i < p.w * p.h * 3; i++) {
-      ctx.fillStyle = `rgba(50,15,35,${0.06 + r() * 0.1})`;
-      ctx.beginPath();
-      ctx.ellipse(X + r() * Wp, Y + r() * Hp, 6 + r() * 20, 4 + r() * 12, r() * 3, 0, Math.PI * 2);
-      ctx.fill();
+  // Cresta: tapa izquierda, centros alternados y tapa derecha. Si no entra, isla.
+  // Los centros miden 3 celdas.
+  function ridge(ctx, r, p, im) {
+    const X = p.x * G, Y = p.y * G, Wp = p.w * G;
+    const s = 3 * G / im.med1.width;
+    const lw = im.izq.width * s, rw = im.der.width * s;
+    if (Wp < (lw + rw) * 0.85) {
+      piece(ctx, im.isla, X - 4, Y, Wp + 8);
+    } else {
+      const mids = [im.med1, im.med2, im.med3];
+      let x = X + lw - 2;
+      while (x < X + Wp - rw) {
+        const m = mids[(r() * 3) | 0];
+        const left = X + Wp - rw + 2 - x, full = m.width * s;
+        if (left >= full) piece(ctx, m, x, Y, full);
+        else piece(ctx, m, x, Y, left, 0, left / s);
+        x += full - 2;
+      }
+      piece(ctx, im.izq, X, Y, lw);
+      piece(ctx, im.der, X + Wp - rw, Y, rw);
     }
-    for (let i = 0; i < p.w * p.h * 30; i++) {
-      ctx.fillStyle = `rgba(255,235,245,${r() * 0.22})`;
-      ctx.fillRect(X + r() * Wp, Y + 4 + r() * Hp, 1.3, 1.3);
-    }
-    // Vetas blancas finas, como las grietas de la referencia.
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 0.8;
-    for (let i = 0; i < Math.max(1, p.w / 3); i++) {
-      let vx = X + r() * Wp, vy = Y + 6;
-      ctx.beginPath(); ctx.moveTo(vx, vy);
-      for (let k = 0; k < 6; k++) { vx += (r() - 0.5) * 14; vy += 6 + r() * 10; ctx.lineTo(vx, vy); }
-      ctx.stroke();
-    }
-    ctx.restore();
-    edge(ctx, r, X, Y, Wp);
+    edge(ctx, r, X + 2, Y + 2, Wp - 4);
+  }
+
+  // Pilar: se recorta a la altura que ocupa, apoyado sobre el piso.
+  function pillar(ctx, r, p, im) {
+    const w = 1.3 * G, X = p.x * G + G / 2 - w / 2, Y = p.y * G, Hp = p.h * G;
+    const s = w / im.pilar.width;
+    ctx.drawImage(im.pilar, 0, 0, im.pilar.width, Math.min(im.pilar.height, Hp / s), X, Y, w, Math.min(im.pilar.height * s, Hp));
+    edge(ctx, r, X + 3, Y + 2, w - 6);
   }
 
   function fragile(ctx, r, p) {
@@ -151,15 +140,21 @@
     ctx.stroke();
   }
 
-  function paint(ctx) {
-    platforms.forEach((p, i) => {
+  // Primero las crestas, encima pilares, frágiles y rebote.
+  function paint(ctx, im) {
+    const order = { plt: 0, pilar: 1, fragil: 2, rebote: 3 };
+    platforms.map((p, i) => [p, i]).sort((a, b) => order[a[0].t] - order[b[0].t]).forEach(([p, i]) => {
       const r = rng(i + 7);
-      if (p.t === 'pilar') ridge(ctx, r, p, ['#6e2440', '#4b1427'], true);
+      if (p.t === 'pilar') pillar(ctx, r, p, im);
       else if (p.t === 'fragil') fragile(ctx, r, p);
       else if (p.t === 'rebote') bounce(ctx, r, p);
-      else ridge(ctx, r, p, ['#a2466c', '#78294a'], false);
+      else ridge(ctx, r, p, im);
     });
   }
+
+  const images = {};
+  for (const n of ['izq', 'med1', 'med2', 'med3', 'der', 'isla', 'sube', 'baja']) images[n] = `assets/vigilia/plat_${n}.png`;
+  images.pilar = 'assets/vigilia/pilar.png';
 
   CapoEngine.LEVELS.vigilia = {
     name: 'Vigilia',
@@ -173,6 +168,7 @@
       { key: 'medio', src: 'assets/vigilia/medio.png', height: 300, bottom: 16 * G + 24, parallax: 0.4, alpha: 0.7 }
     ],
     platforms,
+    images,
     paint
   };
 })();
