@@ -7,12 +7,12 @@ window.CapoConfig = (function () {
   const FALLBACK = {
     version: 1,
     level: 'vigilia',
-    feel: { grav: 1500, jump: 620, speed: 230, coyote: 110, bounce: 1.45 },
-    camera: { zoom: 2.4 },
+    feel: { grav: 1120, jump: 690, speed: 260, coyote: 95, bounce: 1.6 },
+    camera: { zoom: 2.2 },
     shake: { enabled: true, threshold: 14 },
-    dance: { beat: 0.52 },
+    dance: { beat: 0.57 },
     capo: {
-      height: 70, idle: 'A4', walk: ['D1', 'D2', 'D3'],
+      height: 74, idle: 'A4', walk: ['D1', 'D2', 'D3'],
       takeoff: 'D4', rise: 'D5', spin: 'D6', fall: 'A8',
       yogaAfter: 3.5,
       yoga: ['C7', 'C3', 'C4', 'C1', 'C2', 'C5', 'C6', 'B7', 'B6', 'C0', 'B4'],
