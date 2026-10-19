@@ -36,6 +36,16 @@ assets/capo/        atlas de poses y frames.json con la posición de cada pose
 
 Las superficies se sacan solas: todo lo que se aleja del color del papel se puede pisar, y lo azul rebota.
 
+## Controles
+
+Pantalla limpia: no hay nada dibujado hasta que apoyás un dedo.
+
+- **Izquierda:** apoyá y arrastrá para caminar. Aparece un círculo de tinta donde tocás y se va al soltar.
+- **Izquierda, dedo quieto medio segundo:** Capo baila (el círculo se pone magenta).
+- **Derecha:** tocá en cualquier lado para saltar; mantener salta más alto. Queda una mancha de tinta.
+
+Las UIs anteriores siguen para comparar: `?ui=zonas` y `?ui=botones`.
+
 ## Vigilia
 
 Primer nivel armado por piezas en vez de una foto. Mide 120 × 20 celdas de 36 px.

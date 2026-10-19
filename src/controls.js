@@ -159,6 +159,155 @@ window.CapoControls = (function () {
     };
   }
 
+  // Trazos de pluma: círculo temblado y mancha, para que la UI parezca dibujada como Capo.
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function wobble(r, jitter, turns) {
+    const pts = [], n = 28, a0 = Math.random() * 6.3;
+    for (let i = 0; i <= n * turns; i++) {
+      const a = a0 + (i / n) * Math.PI * 2;
+      const rr = r + (Math.random() - 0.5) * jitter + i * 0.06;
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2;
+      d += ` Q${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+    }
+    return d;
+  }
+  // Mancha de tinta: contorno suave e irregular, con algunas puntas si es salpicadura.
+  function blob(r, spikes) {
+    const n = 22, pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      let rr = r * (0.82 + Math.random() * 0.26);
+      if (spikes && Math.random() < 0.25) rr *= 1.25 + Math.random() * 0.35;
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    const mid = i => { const p = pts[i % n], q = pts[(i + 1) % n]; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; };
+    let m = mid(0), d = `M${m[0].toFixed(1)} ${m[1].toFixed(1)}`;
+    for (let i = 1; i <= n; i++) {
+      const p = pts[i % n], q = mid(i);
+      d += ` Q${p[0].toFixed(1)} ${p[1].toFixed(1)} ${q[0].toFixed(1)} ${q[1].toFixed(1)}`;
+    }
+    return d + 'Z';
+  }
+  function svgEl(size) {
+    const s = document.createElementNS(SVGNS, 'svg');
+    s.setAttribute('viewBox', `${-size / 2} ${-size / 2} ${size} ${size}`);
+    s.setAttribute('width', size); s.setAttribute('height', size);
+    return s;
+  }
+  function path(svg, d, cls) {
+    const p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', d); p.setAttribute('class', cls);
+    svg.appendChild(p);
+    return p;
+  }
+
+  // UI "tinta": pantalla limpia. No hay nada dibujado hasta que apoyás un dedo.
+  // Izquierda: aparece un círculo de pluma donde apoyás y arrastrás para caminar;
+  //   si lo dejás quieto un momento, Capo baila.
+  // Derecha: tocás en cualquier lado para saltar (mantener = salto más alto) y queda una mancha de tinta.
+  function ink(el, api) {
+    const R = 46, DANCE_MS = 550;
+    let mover = null, ox = 0, oy = 0, side = 0, ring = null, knob = null, holdT = null, moved = false;
+    const jumpers = new Set();
+
+    function makeRing(x, y) {
+      const s = svgEl(150);
+      s.classList.add('ink-ring');
+      path(s, wobble(R, 5, 1.15), 'ink-line');
+      path(s, wobble(R - 2, 7, 1.05), 'ink-line thin');
+      const k = document.createElementNS(SVGNS, 'g');
+      path(k, blob(12), 'ink-fill');
+      s.appendChild(k);
+      s.style.left = x + 'px'; s.style.top = y + 'px';
+      el.appendChild(s);
+      requestAnimationFrame(() => s.classList.add('show'));
+      return [s, k];
+    }
+    function dropRing() {
+      if (!ring) return;
+      const r = ring;
+      r.classList.remove('show'); r.classList.add('gone');
+      setTimeout(() => r.remove(), 260);
+      ring = knob = null;
+    }
+    function splash(x, y, big) {
+      const s = svgEl(200);
+      s.classList.add('ink-splash');
+      path(s, blob(big ? 34 : 26, true), 'ink-fill soft');
+      for (let i = 0; i < 6; i++) {
+        const a = Math.random() * 6.3, d = 34 + Math.random() * 30;
+        const c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('cx', (Math.cos(a) * d).toFixed(1)); c.setAttribute('cy', (Math.sin(a) * d).toFixed(1));
+        c.setAttribute('r', (1.5 + Math.random() * 3).toFixed(1)); c.setAttribute('class', 'ink-fill soft');
+        s.appendChild(c);
+      }
+      // La animación va en un contenedor: algunos navegadores no pintan un <svg> animado con transform.
+      const w = document.createElement('div');
+      w.className = 'ink-splash-wrap';
+      w.style.left = x + 'px'; w.style.top = y + 'px';
+      w.appendChild(s);
+      el.appendChild(w);
+      const rot = Math.random() * 360, t0 = performance.now(), dur = 520;
+      (function frame(now) {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        w.style.opacity = (0.95 * (1 - k)).toFixed(3);
+        w.style.transform = `rotate(${rot}deg) scale(${(0.35 + e * 0.85).toFixed(3)})`;
+        if (k < 1) requestAnimationFrame(frame); else w.remove();
+      })(t0);
+    }
+    function moveTo(e) {
+      let dx = e.clientX - ox, dy = e.clientY - oy;
+      const d = Math.hypot(dx, dy);
+      if (d > 10) { moved = true; clearTimeout(holdT); }
+      if (d > R) { dx *= R / d; dy *= R / d; }
+      if (knob) knob.setAttribute('transform', `translate(${dx.toFixed(1)} ${dy.toFixed(1)})`);
+      const n = dx > 12 ? 1 : dx < -12 ? -1 : 0;
+      if (n !== side && n !== 0) haptic(6);
+      side = n;
+      api.input.r = n > 0; api.input.l = n < 0;
+    }
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* nada */ }
+      if (e.clientX < innerWidth * 0.5) {
+        if (mover !== null) return;
+        mover = e.pointerId; ox = e.clientX; oy = e.clientY; side = 0; moved = false;
+        [ring, knob] = makeRing(ox, oy);
+        haptic(6);
+        holdT = setTimeout(() => {
+          if (moved || mover === null) return;
+          if (api.dance()) { haptic(14); ring && ring.classList.add('dance'); }
+        }, DANCE_MS);
+      } else {
+        jumpers.add(e.pointerId);
+        api.input.jumpPressed = true; api.input.jump = true;
+        haptic(10);
+        splash(e.clientX, e.clientY, false);
+      }
+    });
+    el.addEventListener('pointermove', e => { if (e.pointerId === mover) moveTo(e); });
+    const end = e => {
+      if (e.pointerId === mover) {
+        mover = null; side = 0; clearTimeout(holdT);
+        api.input.l = api.input.r = false; dropRing();
+      }
+      if (jumpers.delete(e.pointerId) && !jumpers.size) api.input.jump = false;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    return {
+      release() {
+        mover = null; clearTimeout(holdT); jumpers.clear();
+        api.input.l = api.input.r = false; api.input.jump = false; dropRing();
+      }
+    };
+  }
+
   // Sacudir el celular para saltar. En iPhone hay que pedir permiso desde un toque.
   function shake(getCfg, onShake) {
     let last = 0, enabled = false;
@@ -198,5 +347,5 @@ window.CapoControls = (function () {
     };
   }
 
-  return { keyboard, hold, pad, cross, zones, shake, haptic, ripple };
+  return { keyboard, hold, pad, cross, zones, ink, shake, haptic, ripple };
 })();

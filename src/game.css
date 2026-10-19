@@ -134,3 +134,24 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
   .cross { width: 120px; height: 120px; }
   .round { width: 62px; height: 62px; }
 }
+
+/* UI "tinta": pantalla limpia, solo aparecen trazos de pluma donde tocás. */
+.inkzone { position: absolute; inset: 0; z-index: 2; touch-action: none; overflow: hidden; display: none; }
+.game[data-ui="tinta"] .inkzone { display: block; }
+.game[data-ui="tinta"] .zones, .game[data-ui="tinta"] .zbtns, .game[data-ui="tinta"] .pad { display: none; }
+.game[data-ui="zonas"] .inkzone, .game[data-ui="botones"] .inkzone { display: none; }
+.ink-ring { position: absolute; pointer-events: none; transform: translate(-50%, -50%); overflow: visible; }
+.ink-splash-wrap { position: absolute; width: 200px; height: 200px; margin: -100px 0 0 -100px; pointer-events: none; }
+.ink-splash { display: block; overflow: visible; }
+.ink-ring { opacity: 0; transform: translate(-50%, -50%) scale(0.82) rotate(-8deg); transition: opacity 120ms ease-out, transform 160ms ease-out; }
+.ink-ring.show { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+.ink-ring.gone { opacity: 0; transform: translate(-50%, -50%) scale(1.08); transition-duration: 240ms; }
+.ink-line { fill: none; stroke: rgba(16, 16, 20, 0.78); stroke-width: 2.2; stroke-linecap: round; }
+.ink-line.thin { stroke-width: 1; stroke: rgba(16, 16, 20, 0.5); }
+.ink-fill { fill: rgba(16, 16, 20, 0.82); }
+.ink-fill.soft { fill: rgba(16, 16, 20, 0.55); }
+.ink-ring g { transition: transform 40ms linear; }
+.ink-ring.dance .ink-line { stroke: rgba(200, 40, 120, 0.85); animation: inkpulse 520ms ease-in-out infinite alternate; }
+@keyframes inkpulse { to { stroke-width: 3.4; } }
+.game[data-ui="tinta"] .start-hint { font: 500 clamp(18px, 5vw, 22px) / 1.25 'Caveat', cursive; white-space: pre-line; opacity: 0.92; }
+.game[data-ui="tinta"] .start-sub { font: 700 clamp(22px, 6.4vw, 28px) 'Caveat', cursive; }

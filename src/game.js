@@ -10,13 +10,15 @@
   const vibrate = ms => CapoControls.haptic(ms);
   const gameEl = $('game');
 
-  // UI principal: "zonas" (stick donde apoyás + saltar y bailar). La cruceta vieja sigue en ?ui=botones.
+  // UI principal: "tinta" (pantalla limpia, trazos solo donde tocás).
+  // Las anteriores siguen para comparar: ?ui=zonas y ?ui=botones.
   const HINTS = {
+    tinta: 'izquierda: apoyá y arrastrá para caminar\nderecha: tocá para saltar\ndejá el dedo quieto a la izquierda y Capo baila',
     botones: 'Cruceta para caminar\narriba o A salta · B baila',
     zonas: 'Izquierda: arrastrá para caminar\nDerecha: saltar y bailar'
   };
   let ui = new URLSearchParams(location.search).get('ui');
-  if (!HINTS[ui]) ui = 'zonas';
+  if (!HINTS[ui]) ui = 'tinta';
 
   const api = CapoEngine.create({
     parent: $('view'),
@@ -36,11 +38,12 @@
   CapoControls.pad(api, { jump: 'bJ', dance: 'bD' });
   const crossPad = CapoControls.cross($('cross'), api, $('crossGlass'));
   const zonePad = CapoControls.zones($('zones'), api, $('stick'), $('knob'));
+  const inkPad = CapoControls.ink($('inkzone'), api);
   CapoControls.pad(api, { jump: 'zJ', dance: 'zD' });
 
   function setUI(next) {
     ui = next;
-    crossPad.release(); zonePad.release();
+    crossPad.release(); zonePad.release(); inkPad.release();
     gameEl.dataset.ui = ui;
     $('uiHint').textContent = HINTS[ui];
     api.resize();
