@@ -155,3 +155,26 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 @keyframes inkpulse { to { stroke-width: 3.4; } }
 .game[data-ui="tinta"] .start-hint { font: 500 clamp(18px, 5vw, 22px) / 1.25 'Caveat', cursive; white-space: pre-line; opacity: 0.92; }
 .game[data-ui="tinta"] .start-sub { font: 700 clamp(22px, 6.4vw, 28px) 'Caveat', cursive; }
+
+/* Contador de gotas: arriba a la izquierda, aparece al juntar una y se va solo. */
+.hud {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 14px; z-index: 6;
+  display: flex; align-items: center; gap: 6px; pointer-events: none;
+  font: 700 22px/1 'Caveat', cursive; color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  opacity: 0; transform: translateY(-6px); transition: opacity 220ms ease-out, transform 220ms ease-out;
+}
+.hud.show { opacity: 1; transform: none; }
+.hud.pop span { animation: hudpop 260ms ease-out; }
+@keyframes hudpop { 40% { transform: scale(1.35); } }
+
+/* Cartel escrito a mano: nombre del nivel al entrar, resumen al llegar a la puerta. */
+.card {
+  position: absolute; left: 0; right: 0; top: 22%; z-index: 6; text-align: center; pointer-events: none;
+  color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  opacity: 0; transform: scale(0.94) rotate(-2deg); transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+.card.show { opacity: 1; transform: rotate(-2deg); }
+.card p { margin: 0; }
+.card-name { font: 700 clamp(40px, 12vw, 58px)/1 'Caveat', cursive; }
+.card-sub { margin-top: 4px !important; font: 500 clamp(18px, 5.4vw, 24px)/1.2 'Caveat', cursive; opacity: 0.92; white-space: pre-line; }
+@media (prefers-reduced-motion: reduce) { .hud, .card { transition: none; } .hud.pop span { animation: none; } }

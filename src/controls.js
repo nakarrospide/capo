@@ -41,9 +41,10 @@ window.CapoControls = (function () {
     addEventListener('keydown', e => {
       if (typing()) return;
       const k = e.key.toLowerCase(), i = api.input;
-      if (k === 'arrowleft' || k === 'a') i.l = true;
-      else if (k === 'arrowright' || k === 'd') i.r = true;
+      if (k === 'arrowleft' || k === 'a') { i.l = true; i.mag = null; }
+      else if (k === 'arrowright' || k === 'd') { i.r = true; i.mag = null; }
       else if (k === ' ' || k === 'arrowup' || k === 'w') { if (!e.repeat) i.jumpPressed = true; i.jump = true; }
+      else if (k === 'arrowdown' || k === 's') { if (!e.repeat) i.downPressed = true; i.down = true; }
       else if (k === 'b' && !e.repeat) api.dance();
       else return;
       e.preventDefault();
@@ -53,6 +54,7 @@ window.CapoControls = (function () {
       if (k === 'arrowleft' || k === 'a') i.l = false;
       if (k === 'arrowright' || k === 'd') i.r = false;
       if (k === ' ' || k === 'arrowup' || k === 'w') i.jump = false;
+      if (k === 'arrowdown' || k === 's') i.down = false;
     });
   }
 
@@ -130,10 +132,10 @@ window.CapoControls = (function () {
       const d = Math.hypot(dx, dy);
       if (d > R) { dx *= R / d; dy *= R / d; }
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      stickInput(api, dx, dy, R);
       const n = dx > 12 ? 1 : dx < -12 ? -1 : 0;
       if (n !== side && n !== 0) haptic(6);
       side = n;
-      api.input.r = n > 0; api.input.l = n < 0;
     }
     el.addEventListener('pointerdown', e => {
       e.preventDefault();
@@ -149,13 +151,13 @@ window.CapoControls = (function () {
     });
     el.addEventListener('pointermove', e => { if (e.pointerId === mover) moveTo(e); });
     const end = e => {
-      if (e.pointerId === mover) { mover = null; side = 0; api.input.l = api.input.r = false; stick.classList.remove('show'); }
+      if (e.pointerId === mover) { mover = null; side = 0; stickInput(api, 0, 0, R); stick.classList.remove('show'); }
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
     el.addEventListener('contextmenu', e => e.preventDefault());
     return {
-      release() { mover = null; api.input.l = api.input.r = false; stick.classList.remove('show'); }
+      release() { mover = null; stickInput(api, 0, 0, R); stick.classList.remove('show'); }
     };
   }
 
@@ -203,6 +205,17 @@ window.CapoControls = (function () {
     p.setAttribute('d', d); p.setAttribute('class', cls);
     svg.appendChild(p);
     return p;
+  }
+
+  // Stick analógico: cuánto se arrastra decide si camina o corre; tirar para abajo baja de una plataforma fina.
+  function stickInput(api, dx, dy, R) {
+    const i = api.input;
+    i.r = dx > 12; i.l = dx < -12;
+    i.mag = i.l || i.r ? Math.max(0, Math.min(1, (Math.abs(dx) - 12) / (R * 0.7 - 12))) : null;
+    const down = dy > R * 0.55 && dy > Math.abs(dx) * 1.1;
+    if (down && !i.down) { i.downPressed = true; haptic(6); }
+    i.down = down;
+    if (down) { i.l = i.r = false; }
   }
 
   // UI "tinta": pantalla limpia. No hay nada dibujado hasta que apoyás un dedo.
@@ -265,10 +278,10 @@ window.CapoControls = (function () {
       if (d > 10) { moved = true; clearTimeout(holdT); }
       if (d > R) { dx *= R / d; dy *= R / d; }
       if (knob) knob.setAttribute('transform', `translate(${dx.toFixed(1)} ${dy.toFixed(1)})`);
+      stickInput(api, dx, dy, R);
       const n = dx > 12 ? 1 : dx < -12 ? -1 : 0;
       if (n !== side && n !== 0) haptic(6);
       side = n;
-      api.input.r = n > 0; api.input.l = n < 0;
     }
     el.addEventListener('pointerdown', e => {
       e.preventDefault();
@@ -293,7 +306,7 @@ window.CapoControls = (function () {
     const end = e => {
       if (e.pointerId === mover) {
         mover = null; side = 0; clearTimeout(holdT);
-        api.input.l = api.input.r = false; dropRing();
+        stickInput(api, 0, 0, R); dropRing();
       }
       if (jumpers.delete(e.pointerId) && !jumpers.size) api.input.jump = false;
     };
@@ -303,7 +316,7 @@ window.CapoControls = (function () {
     return {
       release() {
         mover = null; clearTimeout(holdT); jumpers.clear();
-        api.input.l = api.input.r = false; api.input.jump = false; dropRing();
+        stickInput(api, 0, 0, R); api.input.jump = false; dropRing();
       }
     };
   }

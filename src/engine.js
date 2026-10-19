@@ -40,12 +40,14 @@ window.CapoEngine = (function () {
     return m;
   }
 
-  // Nivel armado: cada pieza ocupa sus celdas. 2 = rebote.
+  // Nivel armado: cada pieza ocupa sus celdas. 2 = rebote, 3 = plataforma fina (se puede bajar de ella).
+  // Frágiles, móviles, párpados y espinas se manejan aparte porque cambian con el tiempo.
+  const DYNAMIC = { fragil: 1, movil: 1, parpado: 1, espinas: 1 };
   function buildMask(L) {
     const m = new Uint8Array(COLS * ROWS), g = L.grid / CELL;
     for (const p of L.platforms) {
-      if (p.t === 'fragil') continue; // las frágiles se manejan aparte: aparecen y desaparecen
-      const v = p.t === 'rebote' ? 2 : 1;
+      if (DYNAMIC[p.t]) continue;
+      const v = p.t === 'rebote' ? 2 : (p.t === 'plt' && (p.h || 1) <= 2 ? 3 : 1);
       const r0 = Math.round(p.y * g), r1 = Math.min(ROWS, Math.round((p.y + (p.h || 1)) * g));
       const c0 = Math.max(0, Math.round(p.x * g)), c1 = Math.min(COLS, Math.round((p.x + p.w) * g));
       for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) if (!m[r * COLS + c] || r === r0) m[r * COLS + c] = v;
@@ -61,7 +63,7 @@ window.CapoEngine = (function () {
       const col = [];
       for (let r = 0; r < ROWS; r++) {
         const v = mask[r * COLS + c];
-        if (v && (r === 0 || !mask[(r - 1) * COLS + c])) col.push({ y: r * CELL, b: v === 2 });
+        if (v && (r === 0 || !mask[(r - 1) * COLS + c])) col.push({ y: r * CELL, b: v === 2, thin: v === 3 });
       }
       tops.push(col);
     }
@@ -79,10 +81,12 @@ window.CapoEngine = (function () {
     const parent = opts.parent;
     let cfg = opts.cfg;
     const on = opts.on || (() => {});
-    const input = { l: false, r: false, jump: false, jumpPressed: false };
+    // mag: cuánto se empuja el stick (0 a 1). Sin stick (teclado, botones) se corre a fondo.
+    const input = { l: false, r: false, jump: false, jumpPressed: false, down: false, downPressed: false, mag: null };
     let scene, player, fx, dbg, bg, capoImg, camTarget, frames = {};
     let sprite = null, spriteMeta = null;
     let tops = [], masks = {}, particles = [], showSurf = false, ready = false, built = [], fragiles = [], eyes = [], checkpoint = -1;
+    let movers = [], spikes = [], drops = [], stakes = [], door = null, levelT = 0, winT = 0;
     let levelId = new URLSearchParams(location.search).get('nivel') || cfg.level;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
 
@@ -167,8 +171,10 @@ window.CapoEngine = (function () {
       player = {
         x: 0, feet: 0, vx: 0, vy: 0, grounded: false, coyote: 0, buffer: 0, dir: 1, phase: 0,
         squash: 1, squashV: 0, airT: 0, idleT: 0, spin: 0, rot: 0,
+        tilt: 0, skid: 0, landT: 0, dropT: 0, dropY: 0, ground: null, life: 0,
         dancing: false, danceT: 0, beat: 0, danceFrame: cfg.capo.dance[0]
       };
+      makeTextures();
       const cam = this.cameras.main;
       cam.setZoom(playZoom()).startFollow(camTarget, true, 0.12, 0.12);
       playFrame(cam);
@@ -182,6 +188,8 @@ window.CapoEngine = (function () {
       levelId = id;
       if (!scene) return;
       built.forEach(o => o.destroy()); built = []; fragiles = []; eyes = []; checkpoint = -1;
+      movers = []; spikes = []; drops = []; stakes = []; door = null; winT = 0;
+      if (player) player.won = false;
       const L = LEVELS[id];
       if (L.built) {
         setDims(L.w, L.h);
@@ -197,6 +205,7 @@ window.CapoEngine = (function () {
       tops = surfaces(masks[id]);
       respawn();
       if (player.dancing) stopDance();
+      on('level', { id, name: L.name, total: drops.length });
     }
 
     // Capas de fondo con parallax y las plataformas pintadas en canvas.
@@ -208,6 +217,7 @@ window.CapoEngine = (function () {
         const t = scene.add.tileSprite(0, ly.bottom - ly.height, W, ly.height, key)
           .setOrigin(0).setTileScale(ly.height / src.height)
           .setScrollFactor(ly.parallax, 1).setAlpha(ly.alpha == null ? 1 : ly.alpha).setDepth(-20 + i);
+        if (ly.tint != null) t.setTint(ly.tint);
         built.push(t);
       });
       // Se pinta al doble de resolución porque la cámara de juego acerca bastante.
@@ -229,6 +239,151 @@ window.CapoEngine = (function () {
       const fkey = 'lvl-' + id + '-img-fragil';
       if (scene.textures.exists(fkey)) for (const p of L.platforms) if (p.t === 'fragil') makeFragile(p, L.grid, fkey);
       for (const e of L.eyes || []) makeEye(e, L, id);
+      L.platforms.forEach((p, i) => {
+        if (p.t === 'movil' || p.t === 'parpado') makeMover(p, L, id, i, imgs);
+        else if (p.t === 'espinas') spikes.push({ x0: p.x * L.grid, x1: (p.x + p.w) * L.grid, y: p.y * L.grid });
+      });
+      for (const [x, y] of L.drops || []) makeDrop(x * L.grid, y * L.grid);
+      for (const c of L.checkpoints || []) makeStake((c.x + 0.5) * L.grid, c.y * L.grid);
+      if (L.door) makeDoor(L.door.x * L.grid, L.door.y * L.grid);
+    }
+
+    /* Texturas dibujadas en código: gota ocre, estaca de control y puerta de salida.
+       Ocre es el color de lo que se junta; la estaca y la puerta van en tinta. */
+    function canvasTex(key, w, h, draw) {
+      if (scene.textures.exists(key)) return;
+      const c = document.createElement('canvas'), R = 3;
+      c.width = w * R; c.height = h * R;
+      const ctx = c.getContext('2d');
+      ctx.scale(R, R);
+      draw(ctx);
+      scene.textures.addCanvas(key, c);
+    }
+    function makeTextures() {
+      canvasTex('gota', 28, 34, ctx => {
+        // Gota de acuarela: mancha ocre con el borde más oscuro, como cuando se seca.
+        const path = () => {
+          ctx.beginPath();
+          ctx.moveTo(14, 2);
+          ctx.bezierCurveTo(17, 10, 25, 15, 25, 22);
+          ctx.bezierCurveTo(25, 29, 20, 32, 14, 32);
+          ctx.bezierCurveTo(8, 32, 3, 29, 3, 22);
+          ctx.bezierCurveTo(3, 15, 11, 10, 14, 2);
+          ctx.closePath();
+        };
+        const g = ctx.createRadialGradient(11, 20, 1, 14, 22, 13);
+        g.addColorStop(0, 'rgba(250,214,120,0.95)');
+        g.addColorStop(0.7, 'rgba(222,160,46,0.92)');
+        g.addColorStop(1, 'rgba(176,110,20,0.95)');
+        path(); ctx.fillStyle = g; ctx.fill();
+        ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(120,70,10,0.75)'; path(); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,248,225,0.85)';
+        ctx.beginPath(); ctx.ellipse(10, 20, 2, 4, -0.4, 0, 6.3); ctx.fill();
+      });
+      canvasTex('estaca', 30, 60, ctx => {
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#141418'; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.moveTo(8, 59); ctx.lineTo(7.5, 30); ctx.lineTo(8.5, 4); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.beginPath(); ctx.moveTo(9, 5); ctx.quadraticCurveTo(18, 7, 27, 6); ctx.lineTo(23, 12); ctx.lineTo(28, 18);
+        ctx.quadraticCurveTo(18, 17, 9, 19); ctx.closePath(); ctx.fill();
+        ctx.lineWidth = 1.4; ctx.stroke();
+      });
+      canvasTex('halo', 64, 64, ctx => {
+        const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        g.addColorStop(0, 'rgba(255,236,190,0.9)');
+        g.addColorStop(0.45, 'rgba(250,214,130,0.35)');
+        g.addColorStop(1, 'rgba(250,214,130,0)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+      });
+      canvasTex('puerta', 70, 110, ctx => {
+        // Vano de luz cálida con marco de tinta temblorosa.
+        const arch = (o) => {
+          ctx.beginPath();
+          ctx.moveTo(12 - o, 108); ctx.lineTo(12 - o, 40);
+          ctx.bezierCurveTo(12 - o, 10 - o, 58 + o, 10 - o, 58 + o, 40);
+          ctx.lineTo(58 + o, 108);
+        };
+        const g = ctx.createRadialGradient(35, 70, 4, 35, 64, 46);
+        g.addColorStop(0, 'rgba(255,246,214,1)');
+        g.addColorStop(0.55, 'rgba(250,214,130,0.95)');
+        g.addColorStop(1, 'rgba(222,160,46,0.55)');
+        arch(0); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+        ctx.lineCap = 'round'; ctx.strokeStyle = '#141418';
+        ctx.lineWidth = 2.6; arch(0); ctx.stroke();
+        ctx.lineWidth = 1; ctx.globalAlpha = 0.6; arch(3); ctx.stroke(); ctx.globalAlpha = 1;
+      });
+    }
+
+    function makeDrop(x, y) {
+      const o = scene.add.image(x, y, 'gota').setScale(1 / 3 * 0.9).setDepth(9);
+      built.push(o);
+      drops.push({ x, y, o, got: false, ph: Math.random() * 6.3 });
+    }
+    function makeStake(x, y) {
+      const o = scene.add.image(x, y + 2, 'estaca').setOrigin(0.27, 1).setScale(1 / 3 * 0.8).setDepth(-2).setAlpha(0.45);
+      built.push(o);
+      stakes.push({ o, on: false, t: 0 });
+    }
+    function makeDoor(x, y) {
+      const glow = scene.add.image(x, y - 22, 'halo').setScale(1.5).setAlpha(0.5).setDepth(-6);
+      const o = scene.add.image(x, y + 2, 'puerta').setOrigin(0.5, 1).setScale(1 / 3 * 0.95).setDepth(-3);
+      built.push(glow, o);
+      door = { x, y, o, glow };
+    }
+
+    /* Piezas que se mueven: "movil" va y vuelve entre dos puntos; "parpado" se abre y se cierra a ritmo.
+       Se pintan una vez en una textura y se mueven como imagen. */
+    function makeMover(p, L, id, i, imgs) {
+      const G = L.grid, w = p.w * G, key = 'mov-' + id + '-' + i, PAD = 8, RES = 2;
+      const ch = Math.round(w * 1.1 + 20);
+      if (!scene.textures.exists(key)) {
+        const c = document.createElement('canvas');
+        c.width = (w + PAD * 2) * RES; c.height = ch * RES;
+        const ctx = c.getContext('2d');
+        ctx.scale(RES, RES);
+        ctx.translate(PAD - p.x * G, 6 - p.y * G);
+        (L.paintPiece || (() => {}))(ctx, p, imgs);
+        scene.textures.addCanvas(key, c);
+      }
+      const img = scene.add.image(0, 0, key).setOrigin(PAD / (w + PAD * 2), 6 / ch).setDisplaySize(w + PAD * 2, ch).setDepth(-4);
+      built.push(img);
+      const to = p.to || [p.x, p.y];
+      const m = {
+        kind: p.t, w, img, ax: p.x * G, ay: p.y * G, bx: to[0] * G, by: to[1] * G,
+        period: p.period || 4, offset: p.offset || 0, on: p.on || 2.2, off: p.off || 1.4,
+        x: p.x * G, y: p.y * G, dx: 0, dy: 0, solid: true, sy: 1, alpha: 1, baseSY: img.scaleY
+      };
+      if (m.kind === 'parpado') m.ghost = scene.add.graphics().setDepth(-4);
+      if (m.ghost) built.push(m.ghost);
+      movers.push(m);
+      placeMover(m, 0, true);
+    }
+    const BLINK = { warn: 0.5, shut: 0.14 };
+    function placeMover(m, t, first) {
+      const px = m.x, py = m.y;
+      if (m.kind === 'movil') {
+        // Va y vuelve con una pausa corta en cada punta, para poder subirse con calma.
+        const ph = (((t / m.period + m.offset) % 1) + 1) % 1, tri = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+        const q = Phaser.Math.Clamp((tri - 0.12) / 0.76, 0, 1), u = q * q * (3 - 2 * q);
+        m.x = m.ax + (m.bx - m.ax) * u; m.y = m.ay + (m.by - m.ay) * u;
+      } else {
+        // Ciclo: abierto, aviso (tiembla), se cierra, cerrado (queda el contorno), se abre.
+        const T = m.on + m.off, k = ((t + m.offset * T) % T + T) % T;
+        let sy = 1, a = 1, shake = 0, solid = true;
+        if (k < m.on - BLINK.warn) { /* abierto */ }
+        else if (k < m.on) { shake = (k - (m.on - BLINK.warn)) / BLINK.warn; }
+        else if (k < m.on + BLINK.shut) { const q = (k - m.on) / BLINK.shut; sy = 1 - q * 0.92; a = 1 - q * 0.85; solid = false; }
+        else if (k < T - BLINK.shut) { sy = 0.08; a = 0.15; solid = false; }
+        else { const q = (k - (T - BLINK.shut)) / BLINK.shut; sy = 0.08 + q * 0.92; a = 0.15 + q * 0.85; solid = q > 0.5; }
+        m.solid = solid; m.sy = sy; m.alpha = a;
+        m.x = m.ax + (shake ? Math.sin(t * 70) * 1.4 * (0.4 + shake) : 0);
+        m.y = m.ay;
+        m.warn = shake;
+      }
+      m.dx = first ? 0 : m.x - px; m.dy = first ? 0 : m.y - py;
+      if (m.kind === 'parpado') m.img.setScale(m.img.scaleX, m.baseSY * m.sy);
+      m.img.setPosition(m.x, m.y).setAlpha(m.alpha);
     }
 
     /* Ojo láser: dormido, despierto, carga (aviso con línea negra), disparo y descanso.
@@ -348,18 +503,83 @@ window.CapoEngine = (function () {
       }
     }
 
+    // Párpado cerrado: queda una línea punteada donde va a volver; avisando, el borde parpadea.
+    function drawMovers() {
+      for (const m of movers) {
+        if (!m.ghost) continue;
+        m.ghost.clear();
+        if (m.sy < 0.99) {
+          m.ghost.fillStyle(0xffffff, 0.55);
+          for (let x = 4; x < m.w - 4; x += 9) m.ghost.fillRect(m.ax + x, m.ay - 1, 4, 1.6);
+        } else if (m.warn > 0 && Math.sin(levelT * 34) > 0) {
+          m.ghost.fillStyle(0xffffff, 0.9);
+          m.ghost.fillRect(m.x + 2, m.y - 2, m.w - 4, 2);
+        }
+      }
+    }
+
     // Muerte: salpicadura roja, una pausa corta y vuelta al último punto de control.
-    function die() {
+    // fell: se cayó al vacío, sin salpicadura (pasa fuera de cuadro).
+    function die(fell) {
       const p = player;
-      if (p.dead) return;
-      p.dead = 0.75; p.vx = 0; p.vy = 0;
-      dust(p.x, p.feet - 30, 18, 0xc80f1d);
-      scene.cameras.main.shake(180, 0.006);
-      on('die');
+      if (p.dead || p.won) return;
+      p.dead = fell ? 0.45 : 0.75; p.vx = 0; p.vy = 0;
+      if (!fell) dust(p.x, p.feet - 30, 18, 0xc80f1d);
+      scene.cameras.main.shake(fell ? 120 : 180, fell ? 0.004 : 0.006);
+      on('die', fell ? 'cayo' : 'golpe');
     }
     function updateCheckpoint() {
       const L = LEVELS[levelId], cps = (L && L.checkpoints) || [];
-      for (let i = checkpoint + 1; i < cps.length; i++) if (player.x >= cps[i].x * L.grid) checkpoint = i;
+      for (let i = checkpoint + 1; i < cps.length; i++) if (player.x >= cps[i].x * L.grid) {
+        checkpoint = i;
+        const k = stakes[i];
+        if (k && !k.on) {
+          k.on = true; k.t = 0; k.o.setAlpha(1);
+          scene.tweens.add({ targets: k.o, scaleX: k.o.scaleX * 1.25, scaleY: k.o.scaleY * 1.25, duration: 120, yoyo: true });
+          dust(k.o.x, k.o.y - 20, 8, 0xffffff);
+          on('checkpoint', i);
+        }
+      }
+    }
+
+    // Gotas: flotan, y al tocarlas se juntan con un brillo. Quedan juntadas aunque Capo muera.
+    function updateDrops(dt) {
+      const p = player;
+      for (const d of drops) {
+        if (d.got) continue;
+        d.ph += dt * 2.4;
+        d.o.setY(d.y + Math.sin(d.ph) * 3).setRotation(Math.sin(d.ph * 0.7) * 0.12);
+        if (!p.dead && Math.abs(p.x - d.x) < 20 && p.feet - 64 < d.y + 10 && p.feet + 4 > d.y - 10) {
+          d.got = true;
+          dust(d.x, d.y, 10, 0xe0a030);
+          scene.tweens.add({ targets: d.o, scale: d.o.scale * 1.8, alpha: 0, y: d.y - 18, duration: 260, ease: 'Quad.easeOut' });
+          on('drop', { got: drops.filter(q => q.got).length, total: drops.length });
+        }
+      }
+      for (const k of stakes) if (k.on) { k.t += dt; k.o.setRotation(Math.sin(k.t * 3) * 0.03); }
+      if (door) door.glow.setAlpha(0.45 + Math.sin(levelT * 2) * 0.1);
+    }
+
+    // Llegar a la puerta: Capo festeja bailando y el nivel pasa al siguiente.
+    function win() {
+      const p = player;
+      p.won = true; winT = 0; p.vx = 0; p.x = door.x;
+      startDance();
+      dust(door.x, door.y - 40, 16, 0xe0a030);
+      const L = LEVELS[levelId];
+      on('goal', { id: levelId, name: L.name, got: drops.filter(q => q.got).length, total: drops.length, next: L.next });
+    }
+    function goNext() {
+      const L = LEVELS[levelId];
+      if (!L || !player.won || player.leaving) return;
+      player.leaving = true;
+      const cam = scene.cameras.main;
+      cam.fadeOut(450, 15, 16, 19);
+      cam.once('camerafadeoutcomplete', () => {
+        player.leaving = false;
+        setLevel(L.next && LEVELS[L.next] ? L.next : levelId);
+        cam.fadeIn(500, 15, 16, 19);
+      });
     }
 
     /* Plataforma frágil: al pisarla tiembla, se desarma en pedazos que caen y a los pocos segundos vuelve. */
@@ -432,20 +652,33 @@ window.CapoEngine = (function () {
     function respawn() {
       const L = LEVELS[levelId], cp = L.checkpoints && L.checkpoints[checkpoint];
       const s = cp ? { x: (cp.x + 1) * L.grid, y: cp.y * L.grid } : L.start;
-      Object.assign(player, { x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0, dead: 0 });
+      Object.assign(player, {
+        x: s.x, feet: s.y, vx: 0, vy: 0, grounded: false, coyote: 0, spin: 0, rot: 0, dead: 0,
+        tilt: 0, skid: 0, landT: 0, dropT: 0, ground: null
+      });
       resetFragiles();
+      levelT = 0;
+      for (const m of movers) placeMover(m, 0, true);
       for (const e of eyes) { e.state = 'sleep'; e.t = 0; e.end = null; }
       if (camTarget) { camTarget.setPosition(s.x, s.y - 50); scene.cameras.main.centerOn(s.x, s.y - 50 + insetWorld(playZoom()) / 2); }
     }
 
+    // Mientras Capo se baja de una plataforma fina, se ignoran las finas que quedan a la altura de donde estaba.
+    const skipThin = y => player.dropT > 0 && y <= player.dropY + 4;
     function findSurface(x, from, to) {
       let best = null;
       const c0 = Math.max(0, Math.floor((x - 6) / CELL)), c1 = Math.min(COLS - 1, Math.floor((x + 6) / CELL));
       for (let c = c0; c <= c1; c++) for (const s of tops[c]) {
+        if (s.thin && skipThin(s.y)) continue;
         if (s.y >= from && s.y <= to && (!best || s.y < best.y)) best = s;
       }
       const f = fragileAt(x, from, to);
-      if (f && (!best || f.y < best.y)) best = { y: f.y, b: false, frag: f };
+      if (f && !skipThin(f.y) && (!best || f.y < best.y)) best = { y: f.y, b: false, thin: true, frag: f };
+      for (const m of movers) {
+        if (!m.solid || x + 7 < m.x || x - 7 > m.x + m.w || skipThin(m.y)) continue;
+        // Si la pieza sube, también cuenta cuando cruzó los pies en este cuadro, con unos píxeles de tolerancia.
+        if (m.y <= to && (m.y >= from - 8 || m.y - m.dy >= from - 1) && (!best || m.y < best.y)) best = { y: m.y, b: false, thin: true, mover: m };
+      }
       return best;
     }
 
@@ -461,8 +694,12 @@ window.CapoEngine = (function () {
       const dt = Math.min(deltaMs / 1000, 1 / 30);
       const p = player, F = cfg.feel;
 
+      levelT += dt; p.life += dt;
+      for (const m of movers) placeMover(m, levelT);
       updateFragiles(dt);
       updateEyes(dt);
+      updateDrops(dt);
+      if (p.won) { winT += dt; danceStep(dt); draw(dt); if (winT > 3.6 && opts.autoNext !== false) goNext(); return; }
       if (p.dead) {
         p.dead -= dt;
         if (p.dead <= 0) respawn();
@@ -472,16 +709,39 @@ window.CapoEngine = (function () {
       updateCheckpoint();
       if (p.dancing) { danceStep(dt); draw(dt); return; }
 
+      // Parado sobre algo que se mueve: Capo viaja con la pieza.
+      if (p.grounded && p.ground && p.ground.mover) {
+        const m = p.ground.mover;
+        if (m.solid) { p.x += m.dx; p.feet = m.y; }
+        else { p.grounded = false; p.coyote = F.coyote / 1000; p.ground = null; }
+      }
+
       const ax = (input.r ? 1 : 0) - (input.l ? 1 : 0);
       if (ax) p.dir = ax;
-      const acc = p.grounded ? 2600 : 1600;
-      const target = ax * F.speed;
+      // Con el stick, poco empuje camina y a fondo corre. Por debajo del 45% de velocidad no tiene sentido: se siente trabado.
+      const mag = input.mag == null ? 1 : 0.45 + 0.55 * Phaser.Math.Clamp(input.mag, 0, 1);
+      const target = ax * F.speed * mag;
+      // Darse vuelta corriendo frena más fuerte y levanta polvo.
+      const turning = ax && p.vx && Math.sign(ax) !== Math.sign(p.vx);
+      if (turning && p.grounded && Math.abs(p.vx) > 150 && p.skid <= 0) { p.skid = 0.16; dust(p.x, p.feet, 6); on('skid'); }
+      let acc = p.grounded ? (turning ? 4200 : ax ? 2600 : 2200) : 1600;
       p.vx += Math.sign(target - p.vx) * Math.min(Math.abs(target - p.vx), acc * dt);
+      p.skid -= dt; p.landT -= dt; p.dropT -= dt;
 
       if (input.jumpPressed) { p.buffer = 0.13; input.jumpPressed = false; }
+      // Abajo sobre una plataforma fina: se baja atravesándola.
+      if (input.downPressed) {
+        input.downPressed = false;
+        if (p.grounded && p.ground && p.ground.thin) {
+          p.dropT = 0.22; p.dropY = p.feet; p.grounded = false; p.ground = null; p.vy = 80; p.coyote = 0;
+          dust(p.x, p.feet, 4); on('drop-through');
+        }
+      }
       p.buffer -= dt; p.coyote -= dt;
       if (p.buffer > 0 && (p.grounded || p.coyote > 0)) {
-        p.vy = -F.jump; p.grounded = false; p.coyote = 0; p.buffer = 0; p.squashV = -3.2;
+        // Saltar desde algo que sube suma su impulso.
+        const lift = p.ground && p.ground.mover ? Math.min(0, p.ground.mover.dy / dt) : 0;
+        p.vy = -F.jump + lift * 0.6; p.grounded = false; p.coyote = 0; p.buffer = 0; p.squashV = -3.2; p.ground = null;
         dust(p.x, p.feet, 5); on('jump');
       }
 
@@ -493,7 +753,8 @@ window.CapoEngine = (function () {
 
       const nf = p.feet + p.vy * dt;
       if (p.vy >= 0) {
-        const s = findSurface(p.x, p.feet - (p.grounded ? 10 : 2), nf + (p.grounded ? 12 : 0));
+        // En el aire hay unos píxeles de tolerancia: si los pies quedaron apenas por debajo de un borde, sube a él.
+        const s = findSurface(p.x, p.feet - (p.grounded ? 10 : 7), nf + (p.grounded ? 12 : 0));
         if (s) {
           if (!p.grounded) {
             const impact = p.vy;
@@ -505,17 +766,21 @@ window.CapoEngine = (function () {
             } else {
               p.feet = s.y; p.vy = 0; p.grounded = true;
               p.squash = Math.max(0.7, 1 - impact / 2600); p.squashV = 0;
+              // Caída fuerte: un instante agachado antes de seguir.
+              if (impact > 420) p.landT = Math.min(0.13, impact / 6500);
               if (impact > 260) { dust(p.x, s.y, Math.min(12, impact / 80 | 0)); on('land', impact); }
             }
           } else { p.feet = s.y; p.vy = 0; }
+          if (p.grounded) p.ground = s;
           if (p.grounded && s.frag && s.frag.state === 'idle') { s.frag.state = 'shake'; s.frag.t = 0; on('crack'); }
         } else {
           if (p.grounded) p.coyote = cfg.feel.coyote / 1000;
-          p.grounded = false; p.feet = nf;
+          p.grounded = false; p.ground = null; p.feet = nf;
         }
-      } else { p.grounded = false; p.feet = nf; }
+      } else { p.grounded = false; p.ground = null; p.feet = nf; }
 
-      if (p.feet > H + 90) { p.dead = 0.01; respawn(); }
+      if (p.feet > H + 90) { die(true); }
+      for (const k of spikes) if (p.x > k.x0 + 5 && p.x < k.x1 - 5 && p.feet > k.y - 18 && p.feet < k.y + 8) { die(); break; }
 
       if (p.grounded) {
         p.airT = 0;
@@ -527,7 +792,17 @@ window.CapoEngine = (function () {
       p.squashV += (1 - p.squash) * 180 * dt;
       p.squashV *= Math.pow(0.0009, dt);
       p.squash = Phaser.Math.Clamp(p.squash + p.squashV * dt, 0.55, 1.35);
-      p.phase += dt * (Math.abs(p.vx) / F.speed) * 12;
+      // La cadencia de la carrera sigue a la velocidad, con un mínimo para que caminar lento no parezca en cámara lenta.
+      const ratio = Math.min(1, Math.abs(p.vx) / F.speed);
+      p.phase += dt * (cfg.capo.walkFps || 9) * (ratio > 0.05 ? 0.5 + 0.5 * ratio : 0);
+
+      // Inclinación: hacia adelante al correr, hacia atrás al frenar, siguiendo la velocidad en el aire.
+      let lean = 0;
+      if (p.grounded) lean = p.skid > 0 ? -0.16 * Math.sign(p.vx) : (p.vx / F.speed) * 0.05;
+      else if (!p.spin) lean = Phaser.Math.Clamp(p.vx / F.speed, -1, 1) * 0.09;
+      p.tilt += (lean - p.tilt) * Math.min(1, dt * 14);
+
+      if (door && !p.won && p.grounded && Math.abs(p.x - door.x) < 16 && Math.abs(p.feet - door.y) < 10) win();
 
       on('state', stateName());
       draw(dt);
@@ -549,7 +824,8 @@ window.CapoEngine = (function () {
         if (p.vy < -60) return p.airT < 0.09 ? C.takeoff : C.rise;
         return C.fall;
       }
-      if (Math.abs(p.vx) > 12) return C.walk[Math.floor(p.phase * 0.9) % C.walk.length];
+      if (p.landT > 0) return C.land || C.takeoff;
+      if (Math.abs(p.vx) > 12) return C.walk[Math.floor(p.phase) % C.walk.length];
       if (p.idleT > C.yogaAfter) return C.yoga[Math.floor((p.idleT - C.yogaAfter) / 1.8) % C.yoga.length];
       return C.idle;
     }
@@ -559,6 +835,7 @@ window.CapoEngine = (function () {
       fx.clear(); dbg.clear();
       camTarget.setPosition(p.x, p.feet - 50);
       drawEyes();
+      drawMovers();
 
       particles = particles.filter(q => {
         q.t += dt; q.vy += 500 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
@@ -593,15 +870,24 @@ window.CapoEngine = (function () {
         return;
       }
 
-      const f = frameName();
-      const s = cfg.capo.height / 172;
-      capoImg.setFrame(frames[f] ? f : cfg.capo.idle).setVisible(!p.dead).setFlipX(p.dir < 0);
+      let f = frameName();
+      if (!frames[f]) f = cfg.capo.idle;
+      const C = cfg.capo, s = C.height / 172 * ((C.scale && C.scale[f]) || 1);
+      capoImg.setFrame(f).setVisible(!p.dead).setFlipX(p.dir < 0);
       if (p.spin) {
         const q = frames[f] || [0, 0, 0, 120];
         capoImg.setOrigin(0.5, 0.5).setPosition(p.x, p.feet - q[3] * s * 0.5 - 8).setRotation(-p.rot * p.dir);
       } else {
-        capoImg.setOrigin(0.5, 1).setPosition(p.x, p.feet + 2)
-          .setRotation(p.dancing ? Math.sin(p.danceT * 5) * 0.07 : 0);
+        // Apoyo bajo la cabeza en la carrera; espejado cuando mira a la izquierda.
+        const ox = (C.anchor && C.anchor[f]) || 0.5;
+        const running = p.grounded && Math.abs(p.vx) > 12 && !p.dancing;
+        // Rebote leve en cada paso y respiración cuando está quieto.
+        const bob = running ? -Math.abs(Math.sin(p.phase * Math.PI)) * 2.2 * Math.min(1, Math.abs(p.vx) / cfg.feel.speed) : 0;
+        const breath = p.grounded && !running && !p.dancing && p.landT <= 0 ? 1 + Math.sin(p.life * 2.3) * 0.012 : 1;
+        capoImg.setOrigin(p.dir < 0 ? 1 - ox : ox, 1).setPosition(p.x, p.feet + 2 + bob)
+          .setRotation(p.dancing ? Math.sin(p.danceT * 5) * 0.07 : p.tilt);
+        capoImg.setScale(s * sx, s * sy * breath);
+        return;
       }
       capoImg.setScale(s * sx, s * sy);
     }
@@ -643,8 +929,8 @@ window.CapoEngine = (function () {
         if (Math.random() < 0.3) p.dir *= -1;
         on('beat');
       }
-      if (input.l || input.r || input.jumpPressed) { input.jumpPressed = false; stopDance(); }
-      on('state', 'bailando');
+      if (!p.won && (input.l || input.r || input.jumpPressed)) { input.jumpPressed = false; stopDance(); }
+      on('state', p.won ? 'festejo' : 'bailando');
     }
 
     function setConfig(next) {
@@ -674,12 +960,18 @@ window.CapoEngine = (function () {
     }
 
     return {
-      input, game, resize, setConfig, setLevel, setSheet, clearSheet, jump, respawn,
+      input, game, resize, setConfig, setLevel, setSheet, clearSheet, jump, respawn, next: goNext,
+      level: () => levelId,
       dance: () => (player && player.dancing ? (stopDance(), false) : startDance()),
       isDancing: () => !!(player && player.dancing),
       showSurfaces: v => { showSurf = !!v; },
       isReady: () => ready,
-      get config() { return cfg; }
+      get config() { return cfg; },
+      get player() { return player; },
+      movers: () => movers.map(m => [+(m.x / 36).toFixed(1), +(m.y / 36).toFixed(1), m.solid]),
+      stats: () => ({ level: levelId, got: drops.filter(d => d.got).length, total: drops.length, won: !!(player && player.won), checkpoint }),
+      // Avanza el juego a mano, en pasos fijos (para probar recorridos sin depender de los cuadros por segundo).
+      step(sec, dt) { dt = dt || 1 / 60; for (let t = 0; t < sec; t += dt) update(0, dt * 1000); }
     };
   }
 

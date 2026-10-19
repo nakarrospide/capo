@@ -9,7 +9,7 @@
 <title>Capo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
-<link rel="stylesheet" href="src/game.css?v=202610190225">
+<link rel="stylesheet" href="src/game.css?v=202610191209">
 </head>
 <body>
   <main class="game" id="game" data-ui="tinta">
@@ -54,15 +54,21 @@
       <p class="start-hint" id="startHint">Sacudí el celular para saltar</p>
     </div>
 
+    <!-- Contador de gotas y carteles escritos a mano: aparecen un momento y se van -->
+    <div class="hud" id="hud" aria-live="polite"><img src="assets/capo/gota.svg" alt="" width="14" height="17"><span id="hudN">0</span></div>
+    <div class="card" id="card" aria-live="polite"><p class="card-name" id="cardName"></p><p class="card-sub" id="cardSub"></p></div>
+
     <span class="sr-only" id="state" aria-live="polite">cargando</span>
     <button id="shakeBtn" hidden>sacudir: off</button>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-  <script src="src/config.js?v=202610190225"></script>
-  <script src="src/engine.js?v=202610190225"></script>
-  <script src="src/vigilia.js?v=202610190225"></script>
-  <script src="src/controls.js?v=202610190225"></script>
-  <script src="src/game.js?v=202610190225"></script>
+  <script src="src/config.js?v=202610191209"></script>
+  <script src="src/engine.js?v=202610191209"></script>
+  <script src="src/piezas.js?v=202610191209"></script>
+  <script src="src/vigilia.js?v=202610191209"></script>
+  <script src="src/parpado.js?v=202610191209"></script>
+  <script src="src/controls.js?v=202610191209"></script>
+  <script src="src/game.js?v=202610191209"></script>
 </body>
 </html>

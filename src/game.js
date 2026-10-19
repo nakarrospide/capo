@@ -31,9 +31,35 @@
       else if (evt === 'crack') vibrate(6);
       else if (evt === 'land' && val > 520) vibrate(10);
       else if (evt === 'dance') { $('bD').classList.toggle('on', val); $('zD').classList.toggle('on', val); }
+      else if (evt === 'drop') { vibrate(8); showHud(val.got, val.total); }
+      else if (evt === 'die') vibrate(val === 'cayo' ? 20 : [30, 40, 30]);
+      else if (evt === 'checkpoint') vibrate(12);
+      else if (evt === 'skid') vibrate(4);
+      else if (evt === 'level') { hudTotal = val.total; showHud(0, val.total, true); if (started) showCard(val.name, '', 1800); }
+      else if (evt === 'goal') {
+        vibrate([20, 60, 20, 60, 40]);
+        const fin = val.next === 'vigilia' ? '\nfin, por ahora' : '';
+        showCard(val.name, `${val.got} de ${val.total} gotas${fin}`, 3300);
+      }
     }
   });
 
+  // Gotas arriba a la izquierda y carteles al entrar a un nivel y al llegar a la puerta.
+  let hudTotal = 0, hudT = null, cardT = null, started = false;
+  function showHud(got, total, quiet) {
+    $('hudN').textContent = `${got}/${total}`;
+    const h = $('hud');
+    if (quiet || !total) { h.classList.remove('show'); return; }
+    h.classList.add('show'); h.classList.remove('pop'); void h.offsetWidth; h.classList.add('pop');
+    clearTimeout(hudT); hudT = setTimeout(() => h.classList.remove('show'), 2200);
+  }
+  function showCard(name, sub, ms) {
+    $('cardName').textContent = name; $('cardSub').textContent = sub;
+    $('card').classList.add('show');
+    clearTimeout(cardT); cardT = setTimeout(() => $('card').classList.remove('show'), ms);
+  }
+
+  window.capo = api; // a mano desde la consola: capo.setLevel('parpado'), capo.showSurfaces(true)
   CapoControls.keyboard(api);
   CapoControls.pad(api, { jump: 'bJ', dance: 'bD' });
   const crossPad = CapoControls.cross($('cross'), api, $('crossGlass'));
@@ -66,6 +92,9 @@
 
   async function begin() {
     startEl.hidden = true;
+    started = true;
+    const L = CapoEngine.LEVELS[api.level()];
+    if (L) showCard(L.name, '', 1800);
     if (cfg.shake.enabled && shake.supported) { await shake.enable(); paintShake(); }
   }
   startEl.addEventListener('pointerdown', e => { e.preventDefault(); begin(); }, { once: true });
