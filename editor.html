@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editor de Capo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="src/editor.css?v=202610210037">
+</head>
+<body>
+<div class="solo-compu">
+  <h1>Editor de niveles</h1>
+  <p>El editor se usa en la compu. Lo que armes ahí se sube al repo y le llega a todos en el juego.</p>
+  <a class="link" href="index.html">Jugar →</a>
+</div>
+
+<div class="app">
+  <header class="bar">
+    <h1>Editor</h1>
+    <select id="nivel" aria-label="Nivel"></select>
+    <button class="btn" id="nuevo">Nuevo nivel</button>
+    <span class="estado" id="estado"></span>
+    <button class="btn" id="probar" title="Abre el juego con este nivel (P)">Probar ▶</button>
+    <button class="btn primary" id="guardar" title="Guarda en la carpeta del repo (⌘S)">Guardar</button>
+    <nav><a href="mesa.html">Mesa</a><a href="index.html">Juego</a></nav>
+  </header>
+
+  <aside class="paleta" id="paleta" aria-label="Piezas"></aside>
+
+  <main class="lienzo" id="lienzo">
+    <canvas id="cv"></canvas>
+    <p class="ayuda">Supr borra · ⌘Z deshace · ⌘D duplica · ⌘ + rueda acerca · Alt sin imán · F encuadra · G grilla · P prueba</p>
+    <span class="zoom" id="zoomTxt"></span>
+  </main>
+
+  <aside class="props" id="props" aria-label="Propiedades"></aside>
+</div>
+<div class="fantasma" id="fantasma" hidden></div>
+
+<script src="src/config.js?v=202610210037"></script>
+<script src="src/piezas.js?v=202610210037"></script>
+<script src="src/niveles.js?v=202610210037"></script>
+<script src="src/editor.js?v=202610210037"></script>
+</body>
+</html>

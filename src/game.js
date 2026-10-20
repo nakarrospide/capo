@@ -1,7 +1,9 @@
 // Juego para celular: pantalla completa, botones tipo consola y salto al sacudir.
 (async function () {
-  // El juego siempre arranca en Vigilia, aunque la mesa haya pusheado otra obra.
-  const START_LEVEL = 'vigilia';
+  // Los niveles salen de levels/*.json. Con ?prueba=1 se juega el borrador que mandó el editor.
+  const prueba = await CapoNiveles.load();
+  // El juego siempre arranca en el primer nivel de la lista, aunque la mesa haya pusheado otra obra.
+  const START_LEVEL = prueba || CapoNiveles.first();
   const loadCfg = async () => ({ ...(await CapoConfig.load()), level: START_LEVEL });
   let cfg = await loadCfg();
   const $ = id => document.getElementById(id);
@@ -38,7 +40,7 @@
       else if (evt === 'level') { hudTotal = val.total; showHud(0, val.total, true); if (started) showCard(val.name, '', 1800); }
       else if (evt === 'goal') {
         vibrate([20, 60, 20, 60, 40]);
-        const fin = val.next === 'vigilia' ? '\nfin, por ahora' : '';
+        const fin = prueba ? '\nprueba del editor' : (val.next === CapoNiveles.first() ? '\nfin, por ahora' : '');
         showCard(val.name, `${val.got} de ${val.total} gotas${fin}`, 3300);
       }
     }
@@ -102,7 +104,7 @@
 
   // La mesa de trabajo pushea ajustes nuevos: si el juego está abierto en otra pestaña, los toma al toque.
   addEventListener('storage', async e => {
-    if (e.key !== CapoConfig.KEY) return;
+    if (e.key !== CapoConfig.KEY || CapoConfig.tactil()) return;
     cfg = await loadCfg();
     api.setConfig(cfg);
     paintShake();

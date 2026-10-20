@@ -1,6 +1,7 @@
 // Ajustes de Capo.
 // config.json es la base que vive en el repo.
 // La mesa de trabajo "pushea" ajustes a localStorage y el juego los toma en ese mismo dispositivo.
+// En el celu la mesa está apagada: el juego usa solo config.json, que es lo que le llega a todos.
 window.CapoConfig = (function () {
   const KEY = 'capo-config';
 
@@ -43,9 +44,14 @@ window.CapoConfig = (function () {
   function local() {
     try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
   }
+  // Pantalla táctil sin mouse ni trackpad: celu (o tablet sin teclado).
+  function tactil() {
+    try { return matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches; }
+    catch (e) { return false; }
+  }
   async function load() {
     const b = await base();
-    const l = local();
+    const l = tactil() ? null : local();
     // Si lo pusheado es de una versión anterior, las poses vienen de la base (cambió el mapa de cuadros).
     if (l && l.version !== b.version) delete l.capo;
     return l ? deep(b, { ...l, version: b.version }) : b;
@@ -56,5 +62,5 @@ window.CapoConfig = (function () {
   }
   function clear() { try { localStorage.removeItem(KEY); } catch (e) { /* nada */ } }
 
-  return { KEY, FALLBACK, deep, clone, base, load, push, clear, hasLocal: () => !!local() };
+  return { KEY, FALLBACK, deep, clone, base, load, push, clear, tactil, hasLocal: () => !!local() };
 })();

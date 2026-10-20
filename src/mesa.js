@@ -1,6 +1,9 @@
 // Mesa de trabajo: ajustar a Capo, probar en vivo y pushear al juego.
 (async function () {
   const $ = id => document.getElementById(id);
+  // En el celu la mesa está apagada por ahora: se ajusta en la compu y se sube config.json.
+  if (CapoConfig.tactil()) { document.body.classList.add('off'); return; }
+  await CapoNiveles.load();
   let cfg = await CapoConfig.load();
   const originEl = $('origin');
   const paintOrigin = () => { originEl.textContent = CapoConfig.hasLocal() ? 'ajustes pusheados' : 'config.json'; };

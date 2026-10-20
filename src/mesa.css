@@ -74,3 +74,12 @@ h2 { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .09e
 .file input { display: none; }
 .status { font: 11.5px var(--mono); color: var(--green); }
 button:focus-visible, input:focus-visible, a:focus-visible, .file:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.link + .link { margin-left: 0; }
+
+/* En el celu la mesa está apagada */
+.solo-compu { display: none; max-width: 420px; margin: 0 auto; padding-block: 48px; gap: 14px; }
+.solo-compu p { color: var(--muted); margin: 0; }
+.solo-compu .link { margin: 0; }
+body.off .solo-compu { display: grid; }
+body.off .wrap { display: none; }

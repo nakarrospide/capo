@@ -5,19 +5,24 @@ Se pisa lo pintado, el azul rebota y Capo gira 360, y si lo dejás quieto hace y
 
 - **Juego:** `index.html`. Pensado para el celular, con botones tipo consola. Sacudí el teléfono para saltar.
 - **Mesa de trabajo:** `mesa.html`. Ajustes en vivo (salto, cámara, baile, sacudida), elección de obra y prueba de hojas de secuencia. El botón **Pushear al juego** guarda los ajustes en el dispositivo y el juego los toma al abrirse.
+- **Editor de niveles:** `editor.html`. Piezas a la izquierda, se arrastran al nivel y se guardan en `levels/`.
+
+La mesa y el editor son para la compu. En el celu están apagados y el juego usa solo lo que está en el repo (`config.json` y `levels/`), que es lo que le llega a todos.
 
 ## Estructura
 
 ```
 index.html          juego
 mesa.html           mesa de trabajo
+editor.html         editor de niveles
 config.json         ajustes base del juego
+levels/             niveles armados por piezas, uno por archivo; index.json dice el orden
 src/config.js       carga config.json y los ajustes pusheados desde la mesa
 src/engine.js       motor: superficies a partir de la imagen, física, poses de Capo, baile
 src/controls.js     teclado, botones táctiles y sacudir el celular
 src/piezas.js       cómo se pinta cada pieza (crestas, pilar, rebote, espinas, islas que se mueven)
-src/vigilia.js      nivel 1, Vigilia: capas de fondo, plataformas y recorrido
-src/parpado.js      nivel 2, Párpado
+src/niveles.js      carga levels/*.json y los arma con las piezas
+src/editor.js       editor de niveles
 src/game.js         arranque del juego
 src/mesa.js         arranque de la mesa
 assets/levels/      obras (una imagen por nivel, 720×826)
@@ -29,6 +34,19 @@ tools/prep_capa.py  prepara capas nuevas: escala, funde bordes, saca el blanco
 tools/prep_plataformas.py  recorta la hoja de plataformas y el pilar en piezas
 assets/capo/        atlas de poses y frames.json con la posición de cada pose
 ```
+
+## Editor de niveles
+
+Abrir `editor.html` en la compu (con el servidor local, ver abajo). Mejor en Chrome o Edge: pueden escribir directo en la carpeta del repo.
+
+- **Armar:** arrastrá piezas del panel izquierdo al nivel (o hacé click y aparecen en el centro). Click selecciona, arrastrar mueve. La manija rosa de la derecha estira el ancho, la de abajo el alto. En el móvil, la manija blanca es adonde va; en los ojos, hacia dónde miran.
+- **Propiedades:** a la derecha, de la pieza elegida. Sin nada elegido, las del nivel: nombre, id del archivo, tamaño, fondo de día o de noche y a qué nivel sigue.
+- **Teclas:** Supr borra, ⌘Z deshace, ⌘⇧Z rehace, ⌘D duplica, flechas mueven (Shift de a 5), Alt suelta el imán, ⌘ + rueda acerca, espacio + arrastrar mueve la vista, F encuadra, G grilla.
+- **Probar:** abre el juego con el nivel tal cual está en el editor (`index.html?prueba=1`), aunque no esté guardado.
+- **Guardar (⌘S):** la primera vez pide la carpeta del repo. Escribe `levels/<id>.json` y lo suma a `levels/index.json`. Después: `python3 tools/bump.py`, commit y push. En Safari o Firefox descarga el `.json` para ponerlo a mano en `levels/`.
+- Lo que no guardaste queda como borrador en el navegador; no se pierde si cerrás la pestaña.
+
+Cada archivo de nivel tiene una pieza por línea, así los cambios se leen bien en git. Las medidas van en celdas de 36 px y `y` es la fila del borde de arriba (lo que se pisa).
 
 ## Agregar una obra
 
@@ -54,9 +72,9 @@ Las UIs anteriores siguen para comparar: `?ui=zonas` y `?ui=botones`.
 Primer nivel armado por piezas en vez de una foto. Mide 120 × 20 celdas de 36 px.
 
 - **Fondo:** `lejano.jpg` (parallax 0,12) y `medio.png`, los tallos con ojos dormidos (parallax 0,4, al 70%).
-- **Plataformas:** piezas pintadas (tapas, tres centros, isla, rampas y pilar) recortadas de la hoja con `tools/prep_plataformas.py`. La línea blanca pisable la dibuja el juego encima. Frágil y rebote siguen dibujadas en código. El recorrido de los 5 tramos está en `src/vigilia.js`.
+- **Plataformas:** piezas pintadas (tapas, tres centros, isla, rampas y pilar) recortadas de la hoja con `tools/prep_plataformas.py`. La línea blanca pisable la dibuja el juego encima. Frágil y rebote siguen dibujadas en código. El recorrido de los 5 tramos está en `levels/vigilia.json`.
 - **Ojos láser:** dormido, despierto, carga con línea negra de aviso, disparo y descanso. Tipos: fijo, rastreador y barredor. El haz corta en lo sólido, así que los pilares cubren. Si toca a Capo, vuelve al último punto de control.
-- **Probarlo:** `index.html?nivel=vigilia`, o elegir Vigilia en la mesa y pushear.
+- **Probarlo:** `index.html?nivel=vigilia`, o elegir Vigilia en la mesa y pushear. Para cambiarlo: abrirlo en el editor.
 
 Para cambiar las plataformas: `python3 tools/prep_plataformas.py hoja.png pilar.png assets/vigilia`.
 
