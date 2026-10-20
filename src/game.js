@@ -34,7 +34,7 @@
       else if (evt === 'land' && val > 520) vibrate(10);
       else if (evt === 'dance') { $('bD').classList.toggle('on', val); $('zD').classList.toggle('on', val); }
       else if (evt === 'drop') { vibrate(8); showHud(val.got, val.total); }
-      else if (evt === 'die') vibrate(val === 'cayo' ? 20 : [30, 40, 30]);
+      else if (evt === 'die') { vibrate(val === 'cayo' ? 20 : [30, 40, 30]); releaseAll(); }
       else if (evt === 'checkpoint') vibrate(12);
       else if (evt === 'skid') vibrate(4);
       else if (evt === 'level') { hudTotal = val.total; showHud(0, val.total, true); if (started) showCard(val.name, '', 1800); }
@@ -67,6 +67,8 @@
   const crossPad = CapoControls.cross($('cross'), api, $('crossGlass'));
   const zonePad = CapoControls.zones($('zones'), api, $('stick'), $('knob'));
   const inkPad = CapoControls.ink($('inkzone'), api);
+  // Al morir se sueltan los controles: si alguno quedó trabado, vuelve a andar.
+  function releaseAll() { crossPad.release(); zonePad.release(); inkPad.release(); }
   CapoControls.pad(api, { jump: 'zJ', dance: 'zD' });
 
   function setUI(next) {

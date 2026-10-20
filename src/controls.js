@@ -287,7 +287,9 @@ window.CapoControls = (function () {
       e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch (_) { /* nada */ }
       if (e.clientX < innerWidth * 0.5) {
-        if (mover !== null) return;
+        // Si el navegador se comió el "soltar" del dedo anterior, el stick quedaba trabado:
+        // un toque nuevo a la izquierda toma el control y suelta lo que hubiera.
+        if (mover !== null) { clearTimeout(holdT); stickInput(api, 0, 0, R); dropRing(); }
         mover = e.pointerId; ox = e.clientX; oy = e.clientY; side = 0; moved = false;
         [ring, knob] = makeRing(ox, oy);
         haptic(6);
@@ -312,13 +314,26 @@ window.CapoControls = (function () {
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
+    el.addEventListener('lostpointercapture', end);
     el.addEventListener('contextmenu', e => e.preventDefault());
-    return {
-      release() {
-        mover = null; clearTimeout(holdT); jumpers.clear();
-        stickInput(api, 0, 0, R); api.input.jump = false; dropRing();
-      }
-    };
+    function release() {
+      mover = null; clearTimeout(holdT); jumpers.clear();
+      stickInput(api, 0, 0, R); api.input.jump = false; dropRing();
+    }
+    // Control cruzado con los toques reales: si no queda ningún dedo en la pantalla, se suelta todo,
+    // y si no queda ninguno a la izquierda, se suelta el stick (iOS a veces no avisa que se levantó).
+    function check(e) {
+      const t = e.touches;
+      if (!t) return;
+      if (!t.length) { if (mover !== null || jumpers.size) release(); return; }
+      if (mover !== null && ![...t].some(x => x.clientX < innerWidth * 0.5)) end({ pointerId: mover });
+    }
+    document.addEventListener('touchend', check, true);
+    document.addEventListener('touchcancel', check, true);
+    // Si la app se va a segundo plano o pierde el foco, no puede quedar caminando sola.
+    addEventListener('blur', release);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
+    return { release };
   }
 
   // Sacudir el celular para saltar. En iPhone hay que pedir permiso desde un toque.
