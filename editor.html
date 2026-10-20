@@ -6,7 +6,7 @@
 <title>Editor de Capo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="src/editor.css?v=202610210037">
+<link rel="stylesheet" href="src/editor.css?v=202610210059">
 </head>
 <body>
 <div class="solo-compu">
@@ -22,7 +22,7 @@
     <button class="btn" id="nuevo">Nuevo nivel</button>
     <span class="estado" id="estado"></span>
     <button class="btn" id="probar" title="Abre el juego con este nivel (P)">Probar ▶</button>
-    <button class="btn primary" id="guardar" title="Guarda en la carpeta del repo (⌘S)">Guardar</button>
+    <button class="btn primary" id="guardar" title="Lo sube al repo y sale en el juego (⌘S)">Publicar</button>
     <nav><a href="mesa.html">Mesa</a><a href="index.html">Juego</a></nav>
   </header>
 
@@ -38,9 +38,29 @@
 </div>
 <div class="fantasma" id="fantasma" hidden></div>
 
-<script src="src/config.js?v=202610210037"></script>
-<script src="src/piezas.js?v=202610210037"></script>
-<script src="src/niveles.js?v=202610210037"></script>
-<script src="src/editor.js?v=202610210037"></script>
+<dialog class="gh" id="gh">
+  <form method="dialog">
+    <h3>Conectar con GitHub</h3>
+    <p>Publicar hace un commit en <b id="ghRepo">nakarrospide/capo</b> y GitHub Pages lo sube al juego. Para eso hace falta un token del repo, se pega una vez y queda en este navegador.</p>
+    <ol>
+      <li>Abrí <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+      <li>En <i>Repository access</i>, elegí <i>Only select repositories</i> y marcá capo.</li>
+      <li>En <i>Permissions</i>, <i>Contents</i>: <i>Read and write</i>. Generalo y copialo.</li>
+    </ol>
+    <label>Token<input id="ghToken" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+    <p class="msg" id="ghMsg"></p>
+    <div class="btns">
+      <button type="button" class="btn danger" id="ghOut" hidden>Desconectar</button>
+      <span></span>
+      <button type="button" class="btn" id="ghCancel">Cancelar</button>
+      <button class="btn primary" id="ghOk">Conectar y publicar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="src/config.js?v=202610210059"></script>
+<script src="src/piezas.js?v=202610210059"></script>
+<script src="src/niveles.js?v=202610210059"></script>
+<script src="src/editor.js?v=202610210059"></script>
 </body>
 </html>

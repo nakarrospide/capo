@@ -37,14 +37,14 @@ assets/capo/        atlas de poses y frames.json con la posición de cada pose
 
 ## Editor de niveles
 
-Abrir `editor.html` en la compu (con el servidor local, ver abajo). Mejor en Chrome o Edge: pueden escribir directo en la carpeta del repo.
+Abrir `editor.html` en la compu (sirve directo desde el sitio publicado).
 
 - **Armar:** arrastrá piezas del panel izquierdo al nivel (o hacé click y aparecen en el centro). Click selecciona, arrastrar mueve. La manija rosa de la derecha estira el ancho, la de abajo el alto. En el móvil, la manija blanca es adonde va; en los ojos, hacia dónde miran.
 - **Propiedades:** a la derecha, de la pieza elegida. Sin nada elegido, las del nivel: nombre, id del archivo, tamaño, fondo de día o de noche y a qué nivel sigue.
-- **Teclas:** Supr borra, ⌘Z deshace, ⌘⇧Z rehace, ⌘D duplica, flechas mueven (Shift de a 5), Alt suelta el imán, ⌘ + rueda acerca, espacio + arrastrar mueve la vista, F encuadra, G grilla.
-- **Probar:** abre el juego con el nivel tal cual está en el editor (`index.html?prueba=1`), aunque no esté guardado.
-- **Guardar (⌘S):** la primera vez pide la carpeta del repo. Escribe `levels/<id>.json` y lo suma a `levels/index.json`. Después: `python3 tools/bump.py`, commit y push. En Safari o Firefox descarga el `.json` para ponerlo a mano en `levels/`.
-- Lo que no guardaste queda como borrador en el navegador; no se pierde si cerrás la pestaña.
+- **Teclas:** Supr borra, ⌘Z deshace, ⌘⇧Z rehace, ⌘D duplica, flechas mueven (Shift de a 5), Alt suelta el imán, ⌘ + rueda acerca, espacio + arrastrar mueve la vista, F encuadra, G grilla, P prueba.
+- **Probar:** abre el juego con el nivel tal cual está en el editor (`index.html?prueba=1`), aunque no esté publicado.
+- **Publicar (⌘S):** hace un commit en `main` con `levels/<id>.json` y `levels/index.json`, y GitHub Pages lo sube al juego en uno o dos minutos. La primera vez pide un token de GitHub (fine-grained, solo el repo capo, permiso *Contents: Read and write*); queda guardado en ese navegador.
+- Lo que no publicaste queda como borrador en el navegador; no se pierde si cerrás la pestaña.
 
 Cada archivo de nivel tiene una pieza por línea, así los cambios se leen bien en git. Las medidas van en celdas de 36 px y `y` es la fila del borde de arriba (lo que se pisa).
 

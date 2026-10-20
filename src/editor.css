@@ -81,3 +81,17 @@ h2 { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08e
 body.off { overflow: auto; }
 body.off .solo-compu { display: grid; }
 body.off .app { display: none; }
+
+/* Conectar con GitHub */
+.gh { width: min(460px, calc(100vw - 32px)); border: 1px solid var(--rule); border-radius: 14px; background: var(--panel); color: var(--ink); padding: 20px; }
+.gh::backdrop { background: rgba(15,16,19,.55); }
+.gh h3 { margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+.gh p, .gh ol { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.gh ol { padding-left: 18px; display: grid; gap: 4px; }
+.gh a { color: var(--blue); }
+.gh b, .gh i { color: var(--ink); font-style: normal; font-weight: 600; }
+.gh label { display: grid; gap: 4px; font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
+.gh input { font: 13px var(--mono); color: var(--ink); background: var(--chip); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 8px; }
+.gh .msg { min-height: 1.2em; color: var(--orange); }
+.gh .btns { display: flex; gap: 8px; align-items: center; }
+.gh .btns span { flex: 1; }

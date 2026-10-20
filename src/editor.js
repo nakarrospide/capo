@@ -739,7 +739,8 @@
     const b = document.createElement('div'); b.className = 'btns';
     b.append(btn('Descargar .json', download), btn('Copiar JSON', copyJSON));
     if (drafts()[fileId || d.id] && fileText) b.append(btn('Descartar cambios', discard, 'danger'));
-    f.append(b, note(folderNote()));
+    if (gh) b.append(btn('Cambiar token', openGh));
+    f.append(b, note(ghNote()));
     propsEl.append(f);
   }
   function avisos() {
@@ -781,7 +782,7 @@
   const typing = () => /INPUT|SELECT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName);
   addEventListener('keydown', e => {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
+    if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); publish(); return; }
     if (typing()) return;
     if (e.code === 'Space') { space = true; lienzo.classList.add('pan'); e.preventDefault(); return; }
     if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? step(redo, undo) : step(undo, redo); return; }
@@ -804,7 +805,7 @@
   /* ---------- cargar niveles ---------- */
   const nivelSel = $('nivel');
   async function loadIndex() {
-    try { orden = (await (await fetch('levels/index.json', { cache: 'no-store' })).json()).orden || []; } catch (e) { orden = []; }
+    try { orden = JSON.parse(await readText('levels/index.json')).orden || []; } catch (e) { orden = []; }
   }
   function paintLevelList() {
     const ids = orden.slice();
@@ -815,7 +816,7 @@
       const o = document.createElement('option'); o.value = id;
       const isCur = d && id === (fileId || d.id);
       const name = isCur ? d.name : (drafts()[id] ? drafts()[id].data.name : id);
-      o.textContent = name + (orden.includes(id) ? '' : ' (sin guardar)');
+      o.textContent = name + (orden.includes(id) ? '' : ' (sin publicar)');
       nivelSel.appendChild(o);
     }
     if (d) nivelSel.value = fileId || d.id;
@@ -827,7 +828,7 @@
   }
   async function openLevel(id) {
     let text = '';
-    try { const r = await fetch('levels/' + id + '.json', { cache: 'no-store' }); if (r.ok) text = await r.text(); } catch (e) { /* no está en el repo */ }
+    text = (await readText('levels/' + id + '.json')) || '';
     const draft = drafts()[id];
     const fromFile = text ? JSON.parse(text) : null;
     fileText = fromFile ? serialize(normalize(fromFile)) : '';
@@ -864,11 +865,11 @@
   const estado = $('estado');
   function paintStatus(msg, warn) {
     const dirty = serialize(d) !== fileText;
-    $('guardar').textContent = dirty ? 'Guardar •' : 'Guardar';
+    $('guardar').textContent = dirty ? 'Publicar •' : 'Publicar';
     if (msg) { estado.textContent = msg; estado.classList.toggle('aviso', !!warn); return; }
     const av = avisos();
     estado.classList.toggle('aviso', av.length > 0);
-    estado.textContent = av.length ? av[0] : (dirty ? (fileText ? 'cambios sin guardar (quedan como borrador en este navegador)' : 'nivel nuevo, todavía no está en el repo') : 'igual que en el repo');
+    estado.textContent = av.length ? av[0] : (dirty ? (fileText ? 'cambios sin publicar (quedan como borrador en este navegador)' : 'nivel nuevo, todavía no está publicado') : 'igual que lo publicado');
   }
 
   /* ---------- probar ---------- */
@@ -879,69 +880,128 @@
   }
   $('probar').addEventListener('click', probar);
 
-  /* ---------- guardar en la carpeta del repo ---------- */
-  // Chrome y Edge pueden escribir directo en la carpeta del repo. En los demás se descarga el archivo.
-  const canFolder = 'showDirectoryPicker' in window;
-  let folder = null;
-  function folderNote() {
-    if (!canFolder) return 'Este navegador no deja escribir en carpetas: Guardar descarga el .json. Ponelo en levels/ y sumá el id a levels/index.json.';
-    return folder ? `Guarda en la carpeta "${folder.name}". Después hacé commit y push.` : 'La primera vez que guardes te pide la carpeta del repo (capo). Después hacé commit y push.';
+  /* ---------- publicar en GitHub ---------- */
+  // El editor hace el commit directo en el repo con la API de GitHub y Pages publica solo.
+  // Hace falta un token del repo (se pega una vez y queda guardado en este navegador).
+  const GH_KEY = 'capo-editor-github';
+  function repoGuess() {
+    const h = location.hostname, seg = location.pathname.split('/').filter(Boolean)[0];
+    if (h.endsWith('.github.io') && seg) return { owner: h.split('.')[0], repo: seg };
+    return { owner: 'nakarrospide', repo: 'capo' };
   }
-  const idb = (mode, fn) => new Promise((res, rej) => {
-    const req = indexedDB.open('capo-editor', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('kv');
-    req.onerror = () => rej(req.error);
-    req.onsuccess = () => { const tx = req.result.transaction('kv', mode); const r = fn(tx.objectStore('kv')); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); };
-  });
-  try { folder = await idb('readonly', s => s.get('carpeta')) || null; } catch (e) { folder = null; }
+  let gh = null;
+  try { gh = JSON.parse(localStorage.getItem(GH_KEY) || 'null'); } catch (e) { gh = null; }
 
-  async function getFolder() {
-    if (folder) {
-      const opts = { mode: 'readwrite' };
-      if ((await folder.queryPermission(opts)) === 'granted' || (await folder.requestPermission(opts)) === 'granted') return folder;
+  async function api(path, opt) {
+    opt = opt || {};
+    const r = await fetch(`https://api.github.com/repos/${gh.owner}/${gh.repo}${path}`, {
+      method: opt.method || 'GET', cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + gh.token, Accept: opt.raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body: opt.body ? JSON.stringify(opt.body) : undefined
+    });
+    if (opt.raw && r.status === 404) return null;
+    if (!r.ok) {
+      let msg = r.status + '';
+      try { msg += ' ' + (await r.json()).message; } catch (e) { /* sin detalle */ }
+      if (r.status === 401) msg = 'el token no sirve o venció';
+      if (r.status === 403 || r.status === 404) msg = 'el token no tiene permiso de escritura en ' + gh.owner + '/' + gh.repo;
+      throw new Error(msg);
     }
-    const h = await window.showDirectoryPicker({ id: 'capo', mode: 'readwrite' });
-    folder = h;
-    try { await idb('readwrite', s => s.put(h, 'carpeta')); } catch (e) { /* se pide de nuevo la próxima */ }
-    return h;
+    return opt.raw ? r.text() : r.json();
   }
-  async function writeFile(dir, name, text) {
-    const f = await dir.getFileHandle(name, { create: true });
-    const w = await f.createWritable(); await w.write(text); await w.close();
+  // Lee del repo (lo último publicado) si hay token; si no, del sitio.
+  async function readText(path) {
+    if (gh) { try { return await api(`/contents/${path}?ref=${gh.branch}`, { raw: true }); } catch (e) { /* cae al sitio */ } }
+    try { const r = await fetch(path, { cache: 'no-store' }); return r.ok ? r.text() : null; } catch (e) { return null; }
   }
-  async function save() {
+
+  // Un solo commit con el nivel y el orden (y el archivo viejo borrado si se renombró).
+  async function commitFiles(files, message) {
+    const ref = await api(`/git/ref/heads/${gh.branch}`);
+    const head = await api(`/git/commits/${ref.object.sha}`);
+    const tree = await api('/git/trees', {
+      method: 'POST',
+      body: { base_tree: head.tree.sha, tree: files.map(f => f.content == null ? { path: f.path, mode: '100644', type: 'blob', sha: null } : { path: f.path, mode: '100644', type: 'blob', content: f.content }) }
+    });
+    const commit = await api('/git/commits', { method: 'POST', body: { message, tree: tree.sha, parents: [head.sha] } });
+    await api(`/git/refs/heads/${gh.branch}`, { method: 'PATCH', body: { sha: commit.sha } });
+    return commit;
+  }
+
+  let publishing = false;
+  async function publish() {
+    if (publishing) return;
     const av = avisos().filter(a => a.startsWith('El id'));
     if (av.length) { paintStatus(av[0], true); return; }
-    if (!canFolder) { download(); paintStatus('Descargado. Ponelo en levels/ del repo.'); return; }
+    if (!gh) { openGh(); return; }
+    if (fileText && serialize(d) === fileText && fileId === d.id) { paintStatus('no hay cambios para publicar'); return; }
+    publishing = true;
+    paintStatus('publicando…');
     try {
-      const root = await getFolder();
-      let lv;
-      try { lv = await root.getDirectoryHandle('levels'); }
-      catch (e) { folder = null; paintStatus('Esa carpeta no tiene levels/. Elegí la carpeta capo del repo.', true); return; }
       let idx = { orden: [] };
-      try { idx = JSON.parse(await (await (await lv.getFileHandle('index.json')).getFile()).text()); } catch (e) { /* se crea */ }
+      const idxText = await api(`/contents/levels/index.json?ref=${gh.branch}`, { raw: true });
+      if (idxText) idx = JSON.parse(idxText);
       idx.orden = idx.orden || [];
-      const text = serialize(d);
-      await writeFile(lv, d.id + '.json', text);
-      // Renombrado: el archivo viejo se va y el nuevo queda en su lugar en el orden.
-      if (fileId && fileId !== d.id) {
-        try { await lv.removeEntry(fileId + '.json'); } catch (e) { /* ya no estaba */ }
-        idx.orden = idx.orden.map(id => (id === fileId ? d.id : id));
-        dropDraft(fileId);
-      }
+      const text = serialize(d), files = [{ path: `levels/${d.id}.json`, content: text }];
+      const renamed = fileId && fileId !== d.id;
+      if (renamed) { files.push({ path: `levels/${fileId}.json`, content: null }); idx.orden = idx.orden.map(id => (id === fileId ? d.id : id)); }
       if (!idx.orden.includes(d.id)) idx.orden.push(d.id);
-      await writeFile(lv, 'index.json', JSON.stringify(idx, null, 2) + '\n');
+      files.push({ path: 'levels/index.json', content: JSON.stringify(idx, null, 2) + '\n' });
+      const verb = renamed ? `Renombra ${fileId} a ${d.id}` : (fileText ? 'Actualiza' : 'Nuevo nivel:');
+      await commitFiles(files, `${verb} ${d.name} (editor)`);
+      if (renamed) dropDraft(fileId);
       orden = idx.orden; fileText = text; fileId = d.id;
       dropDraft(d.id);
       paintLevelList(); renderProps();
       const t = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      paintStatus(`guardado a las ${t} en levels/${d.id}.json · falta commit y push`);
+      paintStatus(`publicado a las ${t} · en el juego en uno o dos minutos`);
     } catch (e) {
-      if (e && e.name === 'AbortError') return;
-      paintStatus('No se pudo guardar: ' + (e && e.message || e), true);
-    }
+      paintStatus('No se pudo publicar: ' + (e && e.message || e), true);
+    } finally { publishing = false; }
   }
-  $('guardar').addEventListener('click', save);
+  $('guardar').addEventListener('click', publish);
+
+  // Conectar: se pega el token una vez.
+  const dlg = $('gh');
+  function openGh() {
+    const g = gh || { ...repoGuess(), branch: 'main' };
+    $('ghRepo').textContent = g.owner + '/' + g.repo;
+    $('ghToken').value = '';
+    $('ghMsg').textContent = '';
+    $('ghOut').hidden = !gh;
+    dlg.showModal();
+    $('ghToken').focus();
+  }
+  $('ghOk').addEventListener('click', async e => {
+    e.preventDefault();
+    const token = $('ghToken').value.trim();
+    if (!token) { $('ghMsg').textContent = 'Pegá el token.'; return; }
+    const prev = gh;
+    gh = { ...repoGuess(), branch: 'main', token };
+    $('ghMsg').textContent = 'probando…';
+    try {
+      const info = await api('');
+      if (!info.permissions || !info.permissions.push) throw new Error('el token no tiene permiso de escritura en ' + gh.owner + '/' + gh.repo);
+      gh.branch = info.default_branch || 'main';
+      try { localStorage.setItem(GH_KEY, JSON.stringify(gh)); } catch (er) { /* se pide de nuevo */ }
+      dlg.close();
+      renderProps();
+      publish();
+    } catch (er) {
+      gh = prev;
+      $('ghMsg').textContent = 'No anduvo: ' + er.message;
+    }
+  });
+  $('ghOut').addEventListener('click', e => {
+    e.preventDefault();
+    gh = null; try { localStorage.removeItem(GH_KEY); } catch (er) { /* nada */ }
+    dlg.close(); renderProps();
+    paintStatus('desconectado de GitHub');
+  });
+  $('ghCancel').addEventListener('click', e => { e.preventDefault(); dlg.close(); });
+  function ghNote() {
+    return gh ? `Publica en ${gh.owner}/${gh.repo} (${gh.branch}). Cada publicación es un commit.` : 'Publicar pide un token de GitHub la primera vez.';
+  }
 
   function download() {
     const a = document.createElement('a');
