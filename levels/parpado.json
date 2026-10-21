@@ -4,7 +4,7 @@
   "w": 150,
   "h": 24,
   "fondo": "noche",
-  "start": {"x":3,"y":20},
+  "start": {"x":3,"y":19},
   "platforms": [
     {"t":"plt","x":0,"y":20,"w":10,"h":4},
     {"t":"movil","x":11,"y":19,"w":3,"to":[18,19],"period":4.6},
@@ -64,5 +64,5 @@
     [144.5,19.2]
   ],
   "door": {"x":147.5,"y":20},
-  "next": "vigilia"
+  "next": "seguimos"
 }
